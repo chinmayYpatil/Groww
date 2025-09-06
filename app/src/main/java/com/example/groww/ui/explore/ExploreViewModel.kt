@@ -23,6 +23,9 @@ class ExploreViewModel @Inject constructor(
     private val _topLosers = MutableLiveData<List<StockInfo>>()
     val topLosers: LiveData<List<StockInfo>> = _topLosers
 
+    private val _mostActivelyTraded = MutableLiveData<List<StockInfo>>()
+    val mostActivelyTraded: LiveData<List<StockInfo>> = _mostActivelyTraded
+
     private val _isLoading = MutableLiveData<Boolean>()
     val isLoading: LiveData<Boolean> = _isLoading
 
@@ -35,11 +38,11 @@ class ExploreViewModel @Inject constructor(
                 _isLoading.value = true
                 _error.value = null
 
-                val gainers = getTopGainersUseCase.execute(apiKey)
-                val losers = getTopLosersUseCase.execute(apiKey)
+                val response = getTopGainersUseCase.getTopGainersLosersResponse(apiKey)
 
-                _topGainers.value = gainers
-                _topLosers.value = losers
+                _topGainers.value = response.topGainers
+                _topLosers.value = response.topLosers
+                _mostActivelyTraded.value = response.mostActivelyTraded
 
             } catch (e: Exception) {
                 _error.value = when {
@@ -49,6 +52,9 @@ class ExploreViewModel @Inject constructor(
                         "API limit reached. Please try again later."
                     else -> "Something went wrong. Please try again."
                 }
+                _topGainers.value = emptyList()
+                _topLosers.value = emptyList()
+                _mostActivelyTraded.value = emptyList()
             } finally {
                 _isLoading.value = false
             }

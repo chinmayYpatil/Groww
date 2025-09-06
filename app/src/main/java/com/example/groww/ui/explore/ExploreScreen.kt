@@ -2,9 +2,11 @@ package com.example.groww.ui.explore
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -37,6 +39,7 @@ fun ExploreScreen(
 ) {
     val topGainers by viewModel.topGainers.observeAsState(initial = emptyList())
     val topLosers by viewModel.topLosers.observeAsState(initial = emptyList())
+    val mostActivelyTraded by viewModel.mostActivelyTraded.observeAsState(initial = emptyList())
     val isLoading by viewModel.isLoading.observeAsState(initial = false)
     val error by viewModel.error.observeAsState()
 
@@ -68,11 +71,6 @@ fun ExploreScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Market Overview Cards
-            MarketOverviewSection()
-
-            Spacer(modifier = Modifier.height(24.dp))
-
             // Error State
             error?.let { errorMessage ->
                 ErrorCard(
@@ -83,24 +81,35 @@ fun ExploreScreen(
             }
 
             // Top Gainers Section
-            StockSection(
-                title = "Top Gainers 📈",
+            VerticalStockSection(
+                title = "Top Gainers",
                 subtitle = "Stocks with highest gains today",
                 stocks = topGainers.take(4),
                 isLoading = isLoading,
-                onViewAllClick = { onViewAllClick("gainers") },
-                onStockClick = onStockClick
+                onStockClick = onStockClick,
+                onViewAllClick = { onViewAllClick("gainers") }
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
             // Top Losers Section
-            StockSection(
-                title = "Top Losers 📉",
+            VerticalStockSection(
+                title = "Top Losers",
                 subtitle = "Stocks with highest losses today",
                 stocks = topLosers.take(4),
                 isLoading = isLoading,
-                onViewAllClick = { onViewAllClick("losers") },
+                onStockClick = onStockClick,
+                onViewAllClick = { onViewAllClick("losers") }
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Most Actively Traded Section
+            HorizontalStockSection(
+                title = "Most Actively Traded",
+                subtitle = "Stocks with the most volume today",
+                stocks = mostActivelyTraded,
+                isLoading = isLoading,
                 onStockClick = onStockClick
             )
 
@@ -134,7 +143,7 @@ private fun GrowwTopAppBar(
         ) {
             Column {
                 Text(
-                    text = "Good Morning! 👋",
+                    text = "Good Morning!",
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.White.copy(alpha = 0.9f)
                 )
@@ -212,81 +221,13 @@ private fun WelcomeSection() {
 }
 
 @Composable
-private fun MarketOverviewSection() {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        MarketCard(
-            title = "NIFTY 50",
-            value = "19,745.50",
-            change = "+125.30 (0.64%)",
-            isPositive = true,
-            modifier = Modifier.weight(1f)
-        )
-
-        MarketCard(
-            title = "SENSEX",
-            value = "66,118.69",
-            change = "+398.15 (0.61%)",
-            isPositive = true,
-            modifier = Modifier.weight(1f)
-        )
-    }
-}
-
-@Composable
-private fun MarketCard(
-    title: String,
-    value: String,
-    change: String,
-    isPositive: Boolean,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = MaterialTheme.shapes.medium
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = change,
-                style = MaterialTheme.typography.bodySmall,
-                color = if (isPositive) PositiveGreen else NegativeRed,
-                fontWeight = FontWeight.Medium
-            )
-        }
-    }
-}
-
-@Composable
-private fun StockSection(
+private fun VerticalStockSection(
     title: String,
     subtitle: String,
     stocks: List<StockInfo>,
     isLoading: Boolean,
-    onViewAllClick: () -> Unit,
-    onStockClick: (String) -> Unit
+    onStockClick: (String) -> Unit,
+    onViewAllClick: () -> Unit
 ) {
     Column {
         Row(
@@ -317,9 +258,7 @@ private fun StockSection(
                 )
             }
         }
-
         Spacer(modifier = Modifier.height(12.dp))
-
         if (isLoading) {
             LoadingGrid()
         } else if (stocks.isEmpty()) {
@@ -343,6 +282,50 @@ private fun StockSection(
 }
 
 @Composable
+private fun HorizontalStockSection(
+    title: String,
+    subtitle: String,
+    stocks: List<StockInfo>,
+    isLoading: Boolean,
+    onStockClick: (String) -> Unit
+) {
+    Column {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        if (isLoading) {
+            LoadingRow()
+        } else if (stocks.isEmpty()) {
+            EmptyStateCard()
+        } else {
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(stocks) { stock ->
+                    StockCard(
+                        stock = stock,
+                        onClick = onStockClick,
+                        modifier = Modifier.width(160.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun LoadingGrid() {
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
@@ -357,11 +340,21 @@ private fun LoadingGrid() {
 }
 
 @Composable
-private fun LoadingStockCard() {
+private fun LoadingRow() {
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(4) {
+            LoadingStockCard(modifier = Modifier.width(160.dp))
+        }
+    }
+}
+
+@Composable
+private fun LoadingStockCard(modifier: Modifier = Modifier) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(140.dp),
+        modifier = modifier.height(140.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
@@ -399,7 +392,7 @@ private fun EmptyStateCard() {
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = "📊",
+                text = "📦",
                 style = MaterialTheme.typography.headlineLarge
             )
             Spacer(modifier = Modifier.height(8.dp))
@@ -436,7 +429,7 @@ private fun ErrorCard(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "⚠️ Error Loading Data",
+                text = "⚠️Error Loading Data",
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.error,
                 fontWeight = FontWeight.Medium

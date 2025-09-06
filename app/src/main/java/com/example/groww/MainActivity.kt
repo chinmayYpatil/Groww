@@ -14,7 +14,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.groww.ui.explore.ExploreScreen
 import com.example.groww.ui.navigation.GrowwBottomNavigation
+import com.example.groww.ui.stockdetails.StockDetailsScreen
 import com.example.groww.ui.theme.GrowwTheme
+import com.example.groww.ui.viewall.ViewAllScreen
 import com.example.groww.ui.watchlist.WatchlistScreen
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -66,7 +68,6 @@ fun AppNavHost(
         composable("explore_route") {
             ExploreScreen(
                 onStockClick = { symbol ->
-                    // TODO: Navigate to stock details screen
                     navController.navigate("stock_details/$symbol")
                 },
                 onSearchClick = {
@@ -83,7 +84,6 @@ fun AppNavHost(
         composable("watchlist_route") {
             WatchlistScreen(
                 onStockClick = { symbol ->
-                    // TODO: Navigate to stock details screen
                     navController.navigate("stock_details/$symbol")
                 },
                 onCreateWatchlist = {
@@ -95,8 +95,10 @@ fun AppNavHost(
         // TODO: Add other screen destinations
         composable("stock_details/{symbol}") { backStackEntry ->
             val symbol = backStackEntry.arguments?.getString("symbol") ?: ""
-            // TODO: Implement StockDetailsScreen
-            // StockDetailsScreen(symbol = symbol)
+            StockDetailsScreen(
+                symbol = symbol,
+                onBackClick = { navController.popBackStack() }
+            )
         }
 
         composable("search_route") {
@@ -105,8 +107,13 @@ fun AppNavHost(
 
         composable("view_all/{type}") { backStackEntry ->
             val type = backStackEntry.arguments?.getString("type") ?: ""
-            // TODO: Implement ViewAllScreen
-            // ViewAllScreen(type = type)
+            ViewAllScreen(
+                type = type,
+                onBackClick = { navController.popBackStack() },
+                onStockClick = { symbol ->
+                    navController.navigate("stock_details/$symbol")
+                }
+            )
         }
     }
 }

@@ -28,7 +28,7 @@ class WatchlistViewModel @Inject constructor(
         loadWatchlists()
     }
 
-    private fun loadWatchlists() {
+    fun loadWatchlists() {
         viewModelScope.launch {
             try {
                 _isLoading.value = true
