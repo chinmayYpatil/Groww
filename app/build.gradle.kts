@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,6 +7,7 @@ plugins {
     id("com.google.devtools.ksp")
     id("com.google.dagger.hilt.android")
 }
+
 android {
     namespace = "com.example.groww"
     compileSdk = 35
@@ -17,6 +20,14 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Get the API key from local.properties
+        val properties = Properties()
+        val localPropertiesFile = project.rootProject.file("local.properties")
+        if (localPropertiesFile.exists() && localPropertiesFile.isFile) {
+            localPropertiesFile.inputStream().use { properties.load(it) }
+        }
+        buildConfigField("String", "API_KEY", "\"${properties.getProperty("api_key")}\"")
     }
 
     buildTypes {
@@ -28,22 +39,27 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
+
     kotlinOptions {
         jvmTarget = "1.8"
     }
+
     buildFeatures {
         compose = true
+        buildConfig = true // Required for BuildConfig.API_KEY
     }
+
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.3"
     }
 }
-dependencies {
 
+dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -66,20 +82,18 @@ dependencies {
     val nav_version = "2.8.9"
     implementation("androidx.navigation:navigation-compose:$nav_version")
 
-    //Hilt
+    // Hilt
     implementation("com.google.dagger:hilt-android:2.56.1")
     ksp("com.google.dagger:hilt-android-compiler:2.56.1")
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
 
-    //Room
+    // Room
     val room_version = "2.7.1"
     implementation("androidx.room:room-runtime:$room_version")
     ksp("androidx.room:room-compiler:$room_version")
     implementation("androidx.room:room-ktx:$room_version")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
-
-    // ADD THESE MISSING DEPENDENCIES:
 
     // Retrofit for networking
     implementation("com.squareup.retrofit2:retrofit:2.11.0")

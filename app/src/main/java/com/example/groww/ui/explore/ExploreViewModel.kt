@@ -23,14 +23,39 @@ class ExploreViewModel @Inject constructor(
     private val _topLosers = MutableLiveData<List<StockInfo>>()
     val topLosers: LiveData<List<StockInfo>> = _topLosers
 
+    private val _isLoading = MutableLiveData<Boolean>()
+    val isLoading: LiveData<Boolean> = _isLoading
+
+    private val _error = MutableLiveData<String?>()
+    val error: LiveData<String?> = _error
+
     fun fetchTopStocks(apiKey: String) {
         viewModelScope.launch {
             try {
-                _topGainers.value = getTopGainersUseCase.execute(apiKey)
-                _topLosers.value = getTopLosersUseCase.execute(apiKey)
+                _isLoading.value = true
+                _error.value = null
+
+                val gainers = getTopGainersUseCase.execute(apiKey)
+                val losers = getTopLosersUseCase.execute(apiKey)
+
+                _topGainers.value = gainers
+                _topLosers.value = losers
+
             } catch (e: Exception) {
-                // TODO: Handle errors gracefully, e.g., by updating a LiveData for error state
+                _error.value = when {
+                    e.message?.contains("network", ignoreCase = true) == true ->
+                        "Network error. Please check your connection."
+                    e.message?.contains("api", ignoreCase = true) == true ->
+                        "API limit reached. Please try again later."
+                    else -> "Something went wrong. Please try again."
+                }
+            } finally {
+                _isLoading.value = false
             }
         }
+    }
+
+    fun clearError() {
+        _error.value = null
     }
 }
