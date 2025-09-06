@@ -1,20 +1,31 @@
 package com.example.groww.data.repository
 
+import android.util.Log
 import com.example.groww.data.remote.StockApiService
 import com.example.groww.data.model.network.CompanyOverviewResponse
 import com.example.groww.data.model.network.StockInfo
 import com.example.groww.data.model.network.TickerSearchResponse
 import com.example.groww.data.model.network.TopGainersLosersResponse
+import com.example.groww.data.local.database.dao.TopGainersLosersDao
+import com.example.groww.data.local.database.entities.TopGainersLosersEntity
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.io.IOException
+import java.net.UnknownHostException
+import java.net.SocketTimeoutException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Duration.Companion.days
 
 @Singleton
 class StockRepository @Inject constructor(
-    private val apiService: StockApiService
+    private val apiService: StockApiService,
+    private val topGainersLosersDao: TopGainersLosersDao
 ) {
+    companion object {
+        private const val TAG = "StockRepository"
+    }
+
     // In-memory caches for each API endpoint with a 1-day expiration
     private var topGainersLosersCache: Pair<TopGainersLosersResponse, Long>? = null
     private var companyOverviewCache: MutableMap<String, Pair<CompanyOverviewResponse, Long>> = mutableMapOf()
@@ -31,15 +42,45 @@ class StockRepository @Inject constructor(
 
     suspend fun getTopGainersLosers(apiKey: String): TopGainersLosersResponse {
         return mutex.withLock {
-            val cachedData = topGainersLosersCache
-            if (cachedData != null && isCacheValid(cachedData.second)) {
-                return cachedData.first
+            Log.d(TAG, "Attempting to fetch top gainers/losers data")
+
+            val cachedData = topGainersLosersDao.getTopGainersLosers()
+            if (cachedData != null && isCacheValid(cachedData.timestamp)) {
+                Log.d(TAG, "Using cached data from database")
+                val response = TopGainersLosersResponse(
+                    metadata = cachedData.metadata,
+                    lastUpdated = cachedData.lastUpdated,
+                    topGainers = cachedData.topGainers,
+                    topLosers = cachedData.topLosers,
+                    mostActivelyTraded = cachedData.mostActivelyTraded
+                )
+                // Populate the in-memory cache here
+                topGainersLosersCache = Pair(response, cachedData.timestamp)
+                return response
             }
 
             // Fetch from network if cache is invalid or non-existent
-            val response = apiService.getTopGainersLosers(apiKey)
-            topGainersLosersCache = Pair(response, System.currentTimeMillis())
-            response
+            Log.d(TAG, "Fetching fresh data from API")
+            try {
+                val response = apiService.getTopGainersLosers(apiKey)
+                Log.d(TAG, "API call successful, caching response")
+
+                val entity = TopGainersLosersEntity(
+                    metadata = response.metadata,
+                    lastUpdated = response.lastUpdated,
+                    topGainers = response.topGainers,
+                    topLosers = response.topLosers,
+                    mostActivelyTraded = response.mostActivelyTraded,
+                    timestamp = System.currentTimeMillis()
+                )
+                topGainersLosersDao.insertTopGainersLosers(entity)
+                // Populate the in-memory cache with the new data
+                topGainersLosersCache = Pair(response, System.currentTimeMillis())
+                response
+            } catch (e: Exception) {
+                Log.e(TAG, "API call failed", e)
+                handleNetworkError(e)
+            }
         }
     }
 
@@ -52,33 +93,76 @@ class StockRepository @Inject constructor(
 
     suspend fun getCompanyOverview(symbol: String, apiKey: String): CompanyOverviewResponse? {
         return mutex.withLock {
+            Log.d(TAG, "Fetching company overview for symbol: $symbol")
+
             val cachedData = companyOverviewCache[symbol]
             if (cachedData != null && isCacheValid(cachedData.second)) {
+                Log.d(TAG, "Using cached company overview for $symbol")
                 return cachedData.first
             }
 
             // Fetch from network
-            val response = apiService.getCompanyOverview(symbol, apiKey)
-            if (response.name.isNullOrEmpty()) {
-                // The API returned an empty response, so don't cache it
-                return null
+            try {
+                Log.d(TAG, "Fetching fresh company overview from API for $symbol")
+                val response = apiService.getCompanyOverview(symbol, apiKey)
+                if (response.name.isNullOrEmpty()) {
+                    Log.w(TAG, "API returned empty response for symbol: $symbol")
+                    // The API returned an empty response, so don't cache it
+                    return null
+                }
+                Log.d(TAG, "Company overview API call successful for $symbol")
+                companyOverviewCache[symbol] = Pair(response, System.currentTimeMillis())
+                response
+            } catch (e: Exception) {
+                Log.e(TAG, "Company overview API call failed for $symbol", e)
+                handleNetworkError(e)
             }
-            companyOverviewCache[symbol] = Pair(response, System.currentTimeMillis())
-            response
         }
     }
 
     suspend fun searchSymbol(keywords: String, apiKey: String): TickerSearchResponse {
         return mutex.withLock {
+            Log.d(TAG, "Searching for symbol: $keywords")
+
             val cachedData = tickerSearchCache[keywords]
             if (cachedData != null && isCacheValid(cachedData.second)) {
+                Log.d(TAG, "Using cached search results for: $keywords")
                 return cachedData.first
             }
 
             // Fetch from network
-            val response = apiService.searchSymbol(keywords, apiKey)
-            tickerSearchCache[keywords] = Pair(response, System.currentTimeMillis())
-            response
+            try {
+                Log.d(TAG, "Fetching fresh search results from API for: $keywords")
+                val response = apiService.searchSymbol(keywords, apiKey)
+                Log.d(TAG, "Search API call successful for: $keywords")
+                tickerSearchCache[keywords] = Pair(response, System.currentTimeMillis())
+                response
+            } catch (e: Exception) {
+                Log.e(TAG, "Search API call failed for: $keywords", e)
+                handleNetworkError(e)
+            }
         }
+    }
+
+    private fun handleNetworkError(e: Exception): Nothing {
+        val message = when (e) {
+            is UnknownHostException -> {
+                Log.e(TAG, "DNS resolution failed - check internet connection")
+                "Unable to connect to server. Please check your internet connection."
+            }
+            is SocketTimeoutException -> {
+                Log.e(TAG, "Request timed out")
+                "Request timed out. Please try again."
+            }
+            is IOException -> {
+                Log.e(TAG, "Network IO error: ${e.message}")
+                "Network error occurred. Please check your connection."
+            }
+            else -> {
+                Log.e(TAG, "Unexpected error: ${e.message}")
+                "An unexpected error occurred: ${e.message}"
+            }
+        }
+        throw Exception(message, e)
     }
 }

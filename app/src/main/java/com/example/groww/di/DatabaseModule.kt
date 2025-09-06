@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.example.groww.data.local.database.AppDatabase
 import com.example.groww.data.local.database.dao.WatchlistDao
+import com.example.groww.data.local.database.dao.TopGainersLosersDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -28,5 +29,10 @@ object DatabaseModule {
     @Provides
     fun provideWatchlistDao(database: AppDatabase): WatchlistDao {
         return database.watchlistDao()
+    }
+
+    @Provides
+    fun provideTopGainersLosersDao(database: AppDatabase): TopGainersLosersDao {
+        return database.topGainersLosersDao()
     }
 }

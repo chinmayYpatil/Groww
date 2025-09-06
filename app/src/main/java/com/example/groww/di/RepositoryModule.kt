@@ -1,5 +1,6 @@
 package com.example.groww.di
 
+import com.example.groww.data.local.database.dao.TopGainersLosersDao
 import com.example.groww.data.local.database.dao.WatchlistDao
 import com.example.groww.data.remote.StockApiService
 import com.example.groww.data.repository.StockRepository
@@ -16,8 +17,11 @@ object RepositoryModule {
 
     @Provides
     @Singleton
-    fun provideStockRepository(apiService: StockApiService): StockRepository {
-        return StockRepository(apiService)
+    fun provideStockRepository(
+        apiService: StockApiService,
+        topGainersLosersDao: TopGainersLosersDao
+    ): StockRepository {
+        return StockRepository(apiService, topGainersLosersDao)
     }
 
     @Provides
