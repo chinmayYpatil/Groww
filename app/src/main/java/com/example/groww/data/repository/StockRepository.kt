@@ -7,6 +7,7 @@ import com.example.groww.data.model.network.StockInfo
 import com.example.groww.data.model.network.TickerSearchResponse
 import com.example.groww.data.model.network.TopGainersLosersResponse
 import com.example.groww.data.model.network.TimeSeriesResponse
+import com.example.groww.data.model.network.NewsSentimentResponse
 import com.example.groww.data.local.database.dao.TopGainersLosersDao
 import com.example.groww.data.local.database.entities.TopGainersLosersEntity
 import kotlinx.coroutines.sync.Mutex
@@ -17,6 +18,7 @@ import java.net.SocketTimeoutException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
 
 @Singleton
 class StockRepository @Inject constructor(
@@ -32,14 +34,16 @@ class StockRepository @Inject constructor(
     private var companyOverviewCache: MutableMap<String, Pair<CompanyOverviewResponse, Long>> = mutableMapOf()
     private var tickerSearchCache: MutableMap<String, Pair<TickerSearchResponse, Long>> = mutableMapOf()
     private var timeSeriesCache: MutableMap<String, Pair<TimeSeriesResponse, Long>> = mutableMapOf()
+    private var newsSentimentCache: Pair<NewsSentimentResponse, Long>? = null
 
     // Use mutex to ensure thread-safe cache access
     private val mutex = Mutex()
 
     private val cacheExpirationTimeMs = 1.days.inWholeMilliseconds
+    private val newsCacheExpirationTimeMs = 15.minutes.inWholeMilliseconds
 
-    private fun isCacheValid(timestamp: Long): Boolean {
-        return (System.currentTimeMillis() - timestamp) < cacheExpirationTimeMs
+    private fun isCacheValid(timestamp: Long, expiration: Long): Boolean {
+        return (System.currentTimeMillis() - timestamp) < expiration
     }
 
     suspend fun getTopGainersLosers(apiKey: String): TopGainersLosersResponse {
@@ -47,7 +51,7 @@ class StockRepository @Inject constructor(
             Log.d(TAG, "Attempting to fetch top gainers/losers data")
 
             val cachedData = topGainersLosersDao.getTopGainersLosers()
-            if (cachedData != null && isCacheValid(cachedData.timestamp)) {
+            if (cachedData != null && isCacheValid(cachedData.timestamp, cacheExpirationTimeMs)) {
                 Log.d(TAG, "Using cached data from database")
                 val response = TopGainersLosersResponse(
                     metadata = cachedData.metadata,
@@ -86,6 +90,29 @@ class StockRepository @Inject constructor(
         }
     }
 
+    suspend fun getNewsSentiment(tickers: String, apiKey: String): NewsSentimentResponse {
+        return mutex.withLock {
+            Log.d(TAG, "Attempting to fetch news sentiment data for $tickers")
+
+            val cachedData = newsSentimentCache
+            if (cachedData != null && isCacheValid(cachedData.second, newsCacheExpirationTimeMs)) {
+                Log.d(TAG, "Using cached news data")
+                return cachedData.first
+            }
+
+            try {
+                Log.d(TAG, "Fetching fresh news data from API")
+                val response = apiService.getNewsSentiment(tickers, apiKey)
+                Log.d(TAG, "News API call successful, caching response")
+                newsSentimentCache = Pair(response, System.currentTimeMillis())
+                response
+            } catch (e: Exception) {
+                Log.e(TAG, "News API call failed", e)
+                handleNetworkError(e)
+            }
+        }
+    }
+
     // New function to get a single stock from the cached top gainers/losers list
     fun getStockInfoFromCache(symbol: String): StockInfo? {
         val cachedData = topGainersLosersCache?.first
@@ -98,7 +125,7 @@ class StockRepository @Inject constructor(
             Log.d(TAG, "Fetching company overview for symbol: $symbol")
 
             val cachedData = companyOverviewCache[symbol]
-            if (cachedData != null && isCacheValid(cachedData.second)) {
+            if (cachedData != null && isCacheValid(cachedData.second, cacheExpirationTimeMs)) {
                 Log.d(TAG, "Using cached company overview for $symbol")
                 return cachedData.first
             }
@@ -127,7 +154,7 @@ class StockRepository @Inject constructor(
             Log.d(TAG, "Searching for symbol: $keywords")
 
             val cachedData = tickerSearchCache[keywords]
-            if (cachedData != null && isCacheValid(cachedData.second)) {
+            if (cachedData != null && isCacheValid(cachedData.second, cacheExpirationTimeMs)) {
                 Log.d(TAG, "Using cached search results for: $keywords")
                 return cachedData.first
             }
@@ -155,7 +182,7 @@ class StockRepository @Inject constructor(
             Log.d(TAG, "Fetching daily time series for symbol: $symbol")
 
             val cachedData = timeSeriesCache[symbol]
-            if (cachedData != null && isCacheValid(cachedData.second)) {
+            if (cachedData != null && isCacheValid(cachedData.second, cacheExpirationTimeMs)) {
                 Log.d(TAG, "Using cached time series data for $symbol")
                 return cachedData.first
             }

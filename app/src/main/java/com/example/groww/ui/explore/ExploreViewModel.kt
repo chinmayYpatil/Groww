@@ -5,8 +5,10 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.groww.data.model.network.StockInfo
+import com.example.groww.data.model.network.Article
 import com.example.groww.domain.usecase.GetTopGainersUseCase
 import com.example.groww.domain.usecase.GetTopLosersUseCase
+import com.example.groww.domain.usecase.GetNewsSentimentUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -14,7 +16,8 @@ import javax.inject.Inject
 @HiltViewModel
 class ExploreViewModel @Inject constructor(
     private val getTopGainersUseCase: GetTopGainersUseCase,
-    private val getTopLosersUseCase: GetTopLosersUseCase
+    private val getTopLosersUseCase: GetTopLosersUseCase,
+    private val getNewsSentimentUseCase: GetNewsSentimentUseCase
 ) : ViewModel() {
 
     private val _topGainers = MutableLiveData<List<StockInfo>>()
@@ -25,6 +28,9 @@ class ExploreViewModel @Inject constructor(
 
     private val _mostActivelyTraded = MutableLiveData<List<StockInfo>>()
     val mostActivelyTraded: LiveData<List<StockInfo>> = _mostActivelyTraded
+
+    private val _newsFeed = MutableLiveData<List<Article>>()
+    val newsFeed: LiveData<List<Article>> = _newsFeed
 
     private val _isLoading = MutableLiveData<Boolean>()
     val isLoading: LiveData<Boolean> = _isLoading
@@ -43,6 +49,10 @@ class ExploreViewModel @Inject constructor(
                 _topGainers.value = response.topGainers
                 _topLosers.value = response.topLosers
                 _mostActivelyTraded.value = response.mostActivelyTraded
+
+                // Fetch news data
+                val newsResponse = getNewsSentimentUseCase.execute("AAPL", "demo")
+                _newsFeed.value = newsResponse.feed
 
             } catch (e: Exception) {
                 _error.value = when {

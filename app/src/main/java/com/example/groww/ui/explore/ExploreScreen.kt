@@ -37,8 +37,19 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.groww.BuildConfig
 import com.example.groww.data.model.network.StockInfo
+import com.example.groww.data.model.network.Article
 import com.example.groww.ui.common.StockCard
 import com.example.groww.ui.theme.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.animation.core.InfiniteTransition
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.ui.text.style.TextOverflow
+import coil3.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,12 +58,14 @@ fun ExploreScreen(
     onStockClick: (String) -> Unit = {},
     onSearchClick: () -> Unit = {},
     onViewAllClick: (String) -> Unit = {},
+    onViewAllNewsClick: () -> Unit = {},
     darkTheme: Boolean,
     onThemeToggle: () -> Unit
 ) {
     val topGainers by viewModel.topGainers.observeAsState(initial = emptyList())
     val topLosers by viewModel.topLosers.observeAsState(initial = emptyList())
     val mostActivelyTraded by viewModel.mostActivelyTraded.observeAsState(initial = emptyList())
+    val newsFeed by viewModel.newsFeed.observeAsState(initial = emptyList())
     val isLoading by viewModel.isLoading.observeAsState(initial = false)
     val error by viewModel.error.observeAsState()
 
@@ -130,10 +143,136 @@ fun ExploreScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // News Ticker
+            NewsTicker(news = newsFeed, onViewAllNewsClick = onViewAllNewsClick)
+
+            Spacer(modifier = Modifier.height(24.dp))
+
             // Special IBM Demo Section
             IBMDemoSection(
                 onStockClick = onStockClick
             )
+        }
+    }
+}
+
+@Composable
+private fun NewsTicker(news: List<Article>, onViewAllNewsClick: () -> Unit) {
+    if (news.isEmpty()) {
+        return
+    }
+
+    val scrollState = rememberScrollState()
+    val uriHandler = LocalUriHandler.current
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            scrollState.animateScrollTo(
+                scrollState.maxValue,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(
+                        durationMillis = news.size * 4000, // Slower speed
+                        easing = LinearEasing
+                    ),
+                    repeatMode = RepeatMode.Restart
+                )
+            )
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Latest News",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(
+                onClick = onViewAllNewsClick
+            ) {
+                Text(
+                    text = "View All",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(scrollState, enabled = true)
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Duplicate the list to ensure continuous scrolling
+                val newsToDisplay = news + news + news
+                newsToDisplay.forEach { article ->
+                    NewsCard(
+                        article = article,
+                        onClick = { uriHandler.openUri(article.url) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NewsCard(article: Article, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier
+            .width(280.dp)
+            .height(180.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(4.dp),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            AsyncImage(
+                model = article.bannerImage ?: "https://placehold.co/600x400/E5E7EB/4B5563?text=No+Image",
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp),
+                alignment = Alignment.Center
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp)
+            ) {
+                Text(
+                    text = article.title,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = article.source,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

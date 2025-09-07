@@ -18,6 +18,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.groww.ui.explore.ExploreScreen
 import com.example.groww.ui.navigation.GrowwBottomNavigation
+import com.example.groww.ui.news.NewsCard
 import com.example.groww.ui.stockdetails.StockDetailsScreen
 import com.example.groww.ui.theme.GrowwTheme
 import com.example.groww.ui.search.SearchScreen
@@ -88,6 +89,9 @@ fun AppNavHost(
                 onViewAllClick = { type ->
                     navController.navigate("view_all/$type")
                 },
+                onViewAllNewsClick = {
+                    navController.navigate("view_all_news")
+                },
                 darkTheme = darkTheme,
                 onThemeToggle = onThemeToggle
             )
@@ -154,6 +158,12 @@ fun AppNavHost(
                 onStockClick = { symbol ->
                     navController.navigate("stock_details/$symbol")
                 }
+            )
+        }
+
+        composable("view_all_news") {
+            NewsCard(
+                onBackClick = { navController.popBackStack() }
             )
         }
 

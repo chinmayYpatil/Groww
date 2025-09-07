@@ -1,9 +1,6 @@
 package com.example.groww.data.remote
 
-import com.example.groww.data.model.network.CompanyOverviewResponse
-import com.example.groww.data.model.network.TickerSearchResponse
-import com.example.groww.data.model.network.TopGainersLosersResponse
-import com.example.groww.data.model.network.TimeSeriesResponse
+import com.example.groww.data.model.network.*
 import retrofit2.http.GET
 import retrofit2.http.Query
 
@@ -21,4 +18,7 @@ interface StockApiService {
 
     @GET("query?function=TIME_SERIES_DAILY")
     suspend fun getDailyTimeSeries(@Query("symbol") symbol: String, @Query("apikey") apiKey: String): TimeSeriesResponse
+
+    @GET("query?function=NEWS_SENTIMENT")
+    suspend fun getNewsSentiment(@Query("tickers") tickers: String, @Query("apikey") apiKey: String): NewsSentimentResponse
 }
