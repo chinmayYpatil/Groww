@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -33,15 +35,28 @@ fun AddToWatchlistPopup(
     val isAdding by viewModel.isAdding.observeAsState(initial = false)
     val actionStatus by viewModel.actionStatus.observeAsState()
 
-    if (actionStatus != null) {
-        // You could use a Snackbar or a Toast here
-        onDismiss()
+    // Check which watchlists already contain this stock
+    var existingWatchlistIds by remember { mutableStateOf(setOf<Long>()) }
+
+    LaunchedEffect(symbol, watchlists) {
+        // This would ideally come from the repository, but for now we'll simulate it
+        // In a real implementation, you'd call viewModel.checkExistingWatchlists(symbol)
+        existingWatchlistIds = emptySet() // You can implement this check
+    }
+
+    // Handle successful addition - close popup after a short delay
+    LaunchedEffect(actionStatus) {
+        if (actionStatus != null && (actionStatus!!.contains("Added") || actionStatus!!.contains("Already"))) {
+            // Wait a bit for the user to see the message
+            kotlinx.coroutines.delay(1500)
+            onDismiss()
+        }
     }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
-                .width(300.dp)
+                .width(320.dp)
                 .wrapContentHeight(),
             shape = GrowwShapes.medium,
             color = MaterialTheme.colorScheme.surfaceVariant
@@ -49,7 +64,7 @@ fun AddToWatchlistPopup(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp)
+                    .padding(24.dp)
             ) {
                 Text(
                     text = "Add to Watchlist",
@@ -57,48 +72,89 @@ fun AddToWatchlistPopup(
                     fontWeight = FontWeight.Bold
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Adding: $stockName ($symbol)",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
 
                 // Create New Watchlist section
+                Text(
+                    text = "Create New Watchlist",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
                 OutlinedTextField(
                     value = newWatchlistName,
                     onValueChange = { viewModel.onNewWatchlistNameChange(it) },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("New Watchlist Name") },
-                    trailingIcon = {
-                        Button(
-                            onClick = {
-                                if (newWatchlistName.isNotBlank()) {
-                                    viewModel.addStockToWatchlists(symbol, stockName)
-                                }
-                            },
-                            enabled = newWatchlistName.isNotBlank() && !isAdding
-                        ) {
-                            Text("Add")
-                        }
-                    }
+                    label = { Text("Watchlist Name") },
+                    placeholder = { Text("e.g., Tech Stocks, Growth Picks") },
+                    enabled = !isAdding,
+                    singleLine = true
                 )
 
-                if (watchlists.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                    Divider()
+                Button(
+                    onClick = {
+                        if (newWatchlistName.isNotBlank()) {
+                            viewModel.addStockToWatchlists(symbol, stockName)
+                        }
+                    },
+                    enabled = newWatchlistName.isNotBlank() && !isAdding,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (isAdding) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Adding...")
+                    } else {
+                        Text("Create & Add")
+                    }
+                }
+
+                if (watchlists.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
 
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
-                        text = "Or select existing watchlists",
+                        text = "Or add to existing watchlists",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
 
+                    Spacer(modifier = Modifier.height(12.dp))
+
                     // Existing Watchlists list
                     LazyColumn(modifier = Modifier.heightIn(max = 200.dp)) {
                         items(watchlists) { watchlist ->
+                            val isAlreadyInWatchlist = existingWatchlistIds.contains(watchlist.id)
                             WatchlistCheckboxItem(
                                 watchlist = watchlist,
                                 isChecked = selectedWatchlists.contains(watchlist.id),
-                                onCheckChanged = { viewModel.onWatchlistSelected(watchlist.id) }
+                                onCheckChanged = {
+                                    if (!isAlreadyInWatchlist) {
+                                        viewModel.onWatchlistSelected(watchlist.id)
+                                    }
+                                },
+                                enabled = !isAdding && !isAlreadyInWatchlist,
+                                isAlreadyAdded = isAlreadyInWatchlist
                             )
                         }
                     }
@@ -112,13 +168,70 @@ fun AddToWatchlistPopup(
                     ) {
                         if (isAdding) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                color = MaterialTheme.colorScheme.onPrimary
+                                modifier = Modifier.size(16.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
                             )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Adding...")
                         } else {
-                            Text("Add to Selected")
+                            Text("Add to Selected (${selectedWatchlists.size})")
                         }
                     }
+                }
+
+                // Show status message
+                actionStatus?.let { status ->
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (status.contains("Error") || status.contains("failed")) {
+                                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.1f)
+                            } else {
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
+                            }
+                        ),
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (!status.contains("Error") && !status.contains("failed")) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                            Text(
+                                text = status,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (status.contains("Error") || status.contains("failed")) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Cancel button
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isAdding
+                ) {
+                    Text("Close")
                 }
             }
         }
@@ -129,28 +242,53 @@ fun AddToWatchlistPopup(
 private fun WatchlistCheckboxItem(
     watchlist: WatchlistEntity,
     isChecked: Boolean,
-    onCheckChanged: (Boolean) -> Unit
+    onCheckChanged: (Boolean) -> Unit,
+    enabled: Boolean = true,
+    isAlreadyAdded: Boolean = false
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onCheckChanged(!isChecked) }
+            .clickable(enabled = enabled) { onCheckChanged(!isChecked) }
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Checkbox(
-            checked = isChecked,
-            onCheckedChange = onCheckChanged,
-            colors = CheckboxDefaults.colors(
-                checkedColor = MaterialTheme.colorScheme.primary,
-                uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant
+        if (isAlreadyAdded) {
+            Icon(
+                imageVector = Icons.Default.CheckCircle,
+                contentDescription = "Already added",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
             )
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = watchlist.name,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        } else {
+            Checkbox(
+                checked = isChecked,
+                onCheckedChange = onCheckChanged,
+                enabled = enabled,
+                colors = CheckboxDefaults.colors(
+                    checkedColor = MaterialTheme.colorScheme.primary,
+                    uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            )
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = watchlist.name,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = if (isAlreadyAdded) FontWeight.Medium else FontWeight.Normal
+            )
+
+            if (isAlreadyAdded) {
+                Text(
+                    text = "Already added",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
     }
 }

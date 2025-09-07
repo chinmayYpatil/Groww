@@ -6,20 +6,24 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.groww.BuildConfig
@@ -34,12 +38,9 @@ import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
-import com.github.mikephil.charting.formatter.ValueFormatter
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.collections.ArrayList
-import kotlin.math.log10
-import kotlin.math.pow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,9 +51,40 @@ fun StockDetailsScreen(
 ) {
     val uiState by viewModel.uiState.observeAsState(initial = StockDetailsState.Loading)
     val isStockInWatchlist by viewModel.isStockInWatchlist.observeAsState(initial = false)
+    val actionMessage by viewModel.actionMessage.observeAsState()
+
+    // State for showing the AddToWatchlistPopup
+    var showAddToWatchlistPopup by remember { mutableStateOf(false) }
+
+    // State for toggle button
+    var isToggled by remember { mutableStateOf(false) }
+
+    // Context for showing snackbar
+    val context = LocalContext.current
+
+    // Get stock name for the popup
+    val stockName = when (val state = uiState) {
+        is StockDetailsState.FullDetails -> state.companyOverview.name ?: symbol
+        is StockDetailsState.PartialDetails -> symbol
+        else -> symbol
+    }
+
+    // Update toggle state when watchlist status changes
+    LaunchedEffect(isStockInWatchlist) {
+        isToggled = isStockInWatchlist
+    }
 
     LaunchedEffect(symbol) {
         viewModel.fetchStockDetails(BuildConfig.API_KEY)
+    }
+
+    // Show action message as snackbar
+    LaunchedEffect(actionMessage) {
+        actionMessage?.let { message ->
+            // Here you could show a Snackbar if you want
+            // For now, the message will just be logged
+            viewModel.clearActionMessage()
+        }
     }
 
     Scaffold(
@@ -65,15 +97,35 @@ fun StockDetailsScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* TODO: Open AddToWatchlistPopup */ }) {
-                        Icon(
-                            imageVector = if (isStockInWatchlist) Icons.Default.Star else Icons.Default.Star,
-                            contentDescription = "Toggle Watchlist",
-                            tint = if (isStockInWatchlist) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    // Toggle Button for Watchlist
+                    ToggleButton(
+                        isToggled = isToggled,
+                        onToggle = { newToggleState ->
+                            if (newToggleState) {
+                                // When toggled ON, show popup to select watchlists
+                                showAddToWatchlistPopup = true
+                            } else {
+                                // When toggled OFF, remove from all watchlists
+                                viewModel.removeFromAllWatchlists()
+                            }
+                            isToggled = newToggleState
+                        }
+                    )
                 }
             )
+        },
+        snackbarHost = {
+            actionMessage?.let { message ->
+                Snackbar(
+                    action = {
+                        TextButton(onClick = { viewModel.clearActionMessage() }) {
+                            Text("OK")
+                        }
+                    }
+                ) {
+                    Text(message)
+                }
+            }
         }
     ) { innerPadding ->
         Column(
@@ -90,6 +142,36 @@ fun StockDetailsScreen(
                 is StockDetailsState.Empty -> EmptyState()
             }
         }
+
+        // Show AddToWatchlistPopup when toggle is turned ON
+        if (showAddToWatchlistPopup) {
+            AddToWatchlistPopup(
+                symbol = symbol,
+                stockName = stockName,
+                onDismiss = {
+                    showAddToWatchlistPopup = false
+                    viewModel.refreshWatchlistStatus()
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ToggleButton(
+    isToggled: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    IconButton(
+        onClick = {
+            onToggle(!isToggled)
+        }
+    ) {
+        Icon(
+            imageVector = if (isToggled) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircle,
+            contentDescription = if (isToggled) "Remove from Watchlist" else "Add to Watchlist",
+            tint = if (isToggled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -115,7 +197,7 @@ private fun PartialDetailsContent(stockInfo: StockInfo) {
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Price: ₹${stockInfo.price}",
+                        text = "Price: $${stockInfo.price}",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -181,7 +263,7 @@ private fun StockDetailsContent(stockDetails: CompanyOverviewResponse, timeSerie
                 // Placeholder for price and change from a real-time API
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = "₹177.15",
+                        text = "$177.15",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -254,7 +336,6 @@ private fun StockPriceGraph(timeSeriesData: TimeSeriesResponse) {
     val entries = ArrayList<Entry>()
     val dates = ArrayList<String>()
     val sortedDates = timeSeriesData.timeSeriesDaily.keys.sortedBy { it }
-    val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
 
     for ((index, date) in sortedDates.withIndex()) {
         val data = timeSeriesData.timeSeriesDaily[date]
@@ -271,7 +352,6 @@ private fun StockPriceGraph(timeSeriesData: TimeSeriesResponse) {
             .padding(top = 16.dp, bottom = 16.dp),
         factory = { context ->
             LineChart(context).apply {
-                // Configure chart appearance
                 description.isEnabled = false
                 legend.isEnabled = false
                 axisRight.isEnabled = false
@@ -297,7 +377,7 @@ private fun StockPriceGraph(timeSeriesData: TimeSeriesResponse) {
 
             val lineData = LineData(dataSet)
             lineChart.data = lineData
-            lineChart.invalidate() // refresh chart
+            lineChart.invalidate()
         }
     )
 }
@@ -381,7 +461,7 @@ private fun MetricItem(label: String, value: String, isPrice: Boolean, modifier:
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = if (isPrice) "₹$value" else value,
+            text = if (isPrice) "$$value" else value,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface

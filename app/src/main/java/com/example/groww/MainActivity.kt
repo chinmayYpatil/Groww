@@ -18,6 +18,7 @@ import com.example.groww.ui.stockdetails.StockDetailsScreen
 import com.example.groww.ui.theme.GrowwTheme
 import com.example.groww.ui.viewall.ViewAllScreen
 import com.example.groww.ui.watchlist.WatchlistScreen
+import com.example.groww.ui.watchlist.WatchlistDetailScreen
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -75,7 +76,6 @@ fun AppNavHost(
                     navController.navigate("search_route")
                 },
                 onViewAllClick = { type ->
-                    // TODO: Navigate to view all screen
                     navController.navigate("view_all/$type")
                 }
             )
@@ -83,8 +83,9 @@ fun AppNavHost(
 
         composable("watchlist_route") {
             WatchlistScreen(
-                onStockClick = { symbol ->
-                    navController.navigate("stock_details/$symbol")
+                onWatchlistClick = { watchlistId, watchlistName ->
+                    // Navigate to watchlist detail screen
+                    navController.navigate("watchlist_detail/$watchlistId/$watchlistName")
                 },
                 onCreateWatchlist = {
                     // TODO: Navigate to create watchlist screen
@@ -99,7 +100,21 @@ fun AppNavHost(
             )
         }
 
-        // TODO: Add other screen destinations
+        // Watchlist Detail Screen
+        composable("watchlist_detail/{watchlistId}/{watchlistName}") { backStackEntry ->
+            val watchlistId = backStackEntry.arguments?.getString("watchlistId")?.toLongOrNull() ?: 0L
+            val watchlistName = backStackEntry.arguments?.getString("watchlistName") ?: ""
+            WatchlistDetailScreen(
+                watchlistId = watchlistId,
+                watchlistName = watchlistName,
+                onBackClick = { navController.popBackStack() },
+                onStockClick = { symbol ->
+                    navController.navigate("stock_details/$symbol")
+                }
+            )
+        }
+
+        // Stock Details Screen
         composable("stock_details/{symbol}") { backStackEntry ->
             val symbol = backStackEntry.arguments?.getString("symbol") ?: ""
             StockDetailsScreen(

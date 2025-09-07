@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -22,19 +23,27 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.groww.data.local.database.entities.WatchlistEntity
+import com.example.groww.ui.common.CreateWatchlistPopup
 import com.example.groww.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WatchlistScreen(
-    viewModel: WatchlistViewModel = hiltViewModel(),
-    onStockClick: (String) -> Unit = {},
+    onWatchlistClick: (Long, String) -> Unit = { _, _ -> },
     onCreateWatchlist: () -> Unit = {},
-    onExploreStocks: () -> Unit = {} // Add this parameter
+    onExploreStocks: () -> Unit = {}
 ) {
+    val viewModel: WatchlistViewModel = hiltViewModel()
+
     val watchlists by viewModel.watchlists.observeAsState(initial = emptyList())
-    val isLoading by viewModel.isLoading.observeAsState(initial = false)
+    val isLoading by viewModel.isLoading.observeAsState(initial = true)
     val error by viewModel.error.observeAsState()
+
+    // State for showing create watchlist popup
+    var showCreateWatchlistPopup by remember { mutableStateOf(false) }
+
+    // State for delete confirmation dialog
+    var watchlistToDelete by remember { mutableStateOf<WatchlistEntity?>(null) }
 
     Column(
         modifier = Modifier
@@ -42,29 +51,58 @@ fun WatchlistScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         // Top App Bar
-        WatchlistTopAppBar()
+        WatchlistTopAppBar(
+            onCreateWatchlist = { showCreateWatchlistPopup = true }
+        )
 
         when {
             isLoading -> LoadingState()
             error != null -> ErrorState(message = error!!, onRetry = { viewModel.loadWatchlists() })
             watchlists.isEmpty() -> EmptyWatchlistState(
-                onCreateWatchlist = onCreateWatchlist,
-                onExploreStocks = onExploreStocks // Pass the navigation callback
+                onCreateWatchlist = { showCreateWatchlistPopup = true },
+                onExploreStocks = onExploreStocks
             )
             else -> WatchlistContent(
                 watchlists = watchlists,
-                onWatchlistClick = {
-                    // TODO: Handle navigation to a specific watchlist's stocks
+                onWatchlistClick = onWatchlistClick,
+                onDeleteWatchlist = { watchlist ->
+                    watchlistToDelete = watchlist
                 }
             )
         }
+    }
+
+    // Show Create Watchlist Popup (using common component)
+    if (showCreateWatchlistPopup) {
+        CreateWatchlistPopup(
+            onDismiss = { showCreateWatchlistPopup = false },
+            onWatchlistCreated = { watchlistName ->
+                viewModel.createWatchlist(watchlistName)
+                showCreateWatchlistPopup = false
+            }
+        )
+    }
+
+    // Show Delete Confirmation Dialog
+    watchlistToDelete?.let { watchlist ->
+        DeleteWatchlistDialog(
+            watchlistName = watchlist.name,
+            onConfirm = {
+                viewModel.deleteWatchlist(watchlist)
+                watchlistToDelete = null
+            },
+            onDismiss = {
+                watchlistToDelete = null
+            }
+        )
     }
 }
 
 @Composable
 private fun WatchlistContent(
     watchlists: List<WatchlistEntity>,
-    onWatchlistClick: (WatchlistEntity) -> Unit
+    onWatchlistClick: (Long, String) -> Unit,
+    onDeleteWatchlist: (WatchlistEntity) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier
@@ -76,7 +114,8 @@ private fun WatchlistContent(
         items(watchlists) { watchlist ->
             WatchlistItem(
                 watchlist = watchlist,
-                onClick = { onWatchlistClick(watchlist) }
+                onClick = { onWatchlistClick(watchlist.id, watchlist.name) },
+                onDelete = { onDeleteWatchlist(watchlist) }
             )
         }
     }
@@ -86,7 +125,8 @@ private fun WatchlistContent(
 @Composable
 private fun WatchlistItem(
     watchlist: WatchlistEntity,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onDelete: () -> Unit
 ) {
     Card(
         onClick = onClick,
@@ -94,7 +134,8 @@ private fun WatchlistItem(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(2.dp)
+        elevation = CardDefaults.cardElevation(2.dp),
+        shape = MaterialTheme.shapes.medium
     ) {
         Row(
             modifier = Modifier
@@ -103,55 +144,95 @@ private fun WatchlistItem(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                // Watchlist Icon
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                Column {
+                    Text(
+                        text = watchlist.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Tap to view stocks",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Delete button
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete Watchlist",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeleteWatchlistDialog(
+    watchlistName: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
             Text(
-                text = watchlist.name,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
+                text = "Delete Watchlist",
+                fontWeight = FontWeight.Bold
             )
-            Icon(
-                imageVector = Icons.Default.Add, // Placeholder icon
-                contentDescription = "View Watchlist",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        },
+        text = {
+            Text("Are you sure you want to delete \"$watchlistName\"? This action cannot be undone.")
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Text("Delete")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
         }
-    }
+    )
 }
 
 @Composable
-private fun LoadingState() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-    }
-}
-
-@Composable
-private fun ErrorState(message: String, onRetry: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "Error: $message",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.error,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = onRetry) {
-            Text("Retry")
-        }
-    }
-}
-
-@Composable
-private fun WatchlistTopAppBar() {
+private fun WatchlistTopAppBar(onCreateWatchlist: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -178,7 +259,7 @@ private fun WatchlistTopAppBar() {
             )
 
             IconButton(
-                onClick = { /* TODO: Add new watchlist */ },
+                onClick = onCreateWatchlist,
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
@@ -186,7 +267,7 @@ private fun WatchlistTopAppBar() {
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
-                    contentDescription = "Add Watchlist",
+                    contentDescription = "Create Watchlist",
                     tint = Color.White
                 )
             }
@@ -195,9 +276,45 @@ private fun WatchlistTopAppBar() {
 }
 
 @Composable
+private fun LoadingState() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Loading watchlists...")
+        }
+    }
+}
+
+@Composable
+private fun ErrorState(message: String, onRetry: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "Error: $message",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.error,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(onClick = onRetry) {
+            Text("Retry")
+        }
+    }
+}
+
+@Composable
 private fun EmptyWatchlistState(
     onCreateWatchlist: () -> Unit,
-    onExploreStocks: () -> Unit // Add this parameter
+    onExploreStocks: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -206,7 +323,7 @@ private fun EmptyWatchlistState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Empty state illustration with trending icon
+        // Empty state illustration
         Box(
             modifier = Modifier
                 .size(120.dp)
@@ -248,7 +365,7 @@ private fun EmptyWatchlistState(
 
         // Primary action - Go to explore
         Button(
-            onClick = onExploreStocks, // Use the navigation callback
+            onClick = onExploreStocks,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp),
