@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -24,9 +25,21 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.groww.BuildConfig
 import com.example.groww.data.model.network.CompanyOverviewResponse
 import com.example.groww.data.model.network.StockInfo
+import com.example.groww.data.model.network.TimeSeriesResponse
 import com.example.groww.ui.theme.GrowwTheme
 import com.example.groww.ui.theme.NegativeRed
 import com.example.groww.ui.theme.PositiveGreen
+import androidx.compose.ui.viewinterop.AndroidView
+import com.github.mikephil.charting.charts.LineChart
+import com.github.mikephil.charting.data.Entry
+import com.github.mikephil.charting.data.LineData
+import com.github.mikephil.charting.data.LineDataSet
+import com.github.mikephil.charting.formatter.ValueFormatter
+import java.text.SimpleDateFormat
+import java.util.*
+import kotlin.collections.ArrayList
+import kotlin.math.log10
+import kotlin.math.pow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,7 +85,7 @@ fun StockDetailsScreen(
             when (val state = uiState) {
                 is StockDetailsState.Loading -> LoadingState()
                 is StockDetailsState.Error -> ErrorState(message = state.message, onRetry = { viewModel.fetchStockDetails(BuildConfig.API_KEY) })
-                is StockDetailsState.FullDetails -> StockDetailsContent(stockDetails = state.companyOverview)
+                is StockDetailsState.FullDetails -> StockDetailsContent(stockDetails = state.companyOverview, timeSeriesData = state.timeSeriesData)
                 is StockDetailsState.PartialDetails -> PartialDetailsContent(stockInfo = state.stockInfo)
                 is StockDetailsState.Empty -> EmptyState()
             }
@@ -135,10 +148,9 @@ private fun PartialDetailsContent(stockInfo: StockInfo) {
     }
 }
 
-
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun StockDetailsContent(stockDetails: CompanyOverviewResponse) {
+private fun StockDetailsContent(stockDetails: CompanyOverviewResponse, timeSeriesData: TimeSeriesResponse?) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -184,18 +196,21 @@ private fun StockDetailsContent(stockDetails: CompanyOverviewResponse) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Graph Placeholder
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
-                    .background(Color.LightGray)
-            ) {
-                // TODO: Implement a third-party line graph here
-                Text(
-                    text = "Stock Price Graph Placeholder",
-                    modifier = Modifier.align(Alignment.Center)
-                )
+            // Graph
+            if (timeSeriesData != null && timeSeriesData.timeSeriesDaily.isNotEmpty()) {
+                StockPriceGraph(timeSeriesData = timeSeriesData)
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                        .background(Color.LightGray)
+                ) {
+                    Text(
+                        text = "No graph data available",
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -232,6 +247,59 @@ private fun StockDetailsContent(stockDetails: CompanyOverviewResponse) {
             Spacer(modifier = Modifier.height(100.dp)) // Space for bottom navigation
         }
     }
+}
+
+@Composable
+private fun StockPriceGraph(timeSeriesData: TimeSeriesResponse) {
+    val entries = ArrayList<Entry>()
+    val dates = ArrayList<String>()
+    val sortedDates = timeSeriesData.timeSeriesDaily.keys.sortedBy { it }
+    val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+
+    for ((index, date) in sortedDates.withIndex()) {
+        val data = timeSeriesData.timeSeriesDaily[date]
+        if (data != null) {
+            entries.add(Entry(index.toFloat(), data.close.toFloat()))
+            dates.add(date)
+        }
+    }
+
+    AndroidView(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(200.dp)
+            .padding(top = 16.dp, bottom = 16.dp),
+        factory = { context ->
+            LineChart(context).apply {
+                // Configure chart appearance
+                description.isEnabled = false
+                legend.isEnabled = false
+                axisRight.isEnabled = false
+                xAxis.setDrawGridLines(false)
+                xAxis.setDrawLabels(false)
+                axisLeft.setDrawGridLines(false)
+                setTouchEnabled(true)
+                setPinchZoom(true)
+                isDragEnabled = true
+            }
+        },
+        update = { lineChart ->
+            val dataSet = LineDataSet(entries, "Stock Price")
+            dataSet.color = PositiveGreen.toArgb()
+            dataSet.valueTextColor = PositiveGreen.toArgb()
+            dataSet.valueTextSize = 10f
+            dataSet.lineWidth = 2f
+            dataSet.circleRadius = 4f
+            dataSet.setDrawCircleHole(false)
+            dataSet.setDrawCircles(false)
+            dataSet.setDrawValues(false)
+            dataSet.mode = LineDataSet.Mode.CUBIC_BEZIER
+
+            val lineData = LineData(dataSet)
+            lineChart.data = lineData
+            lineChart.invalidate() // refresh chart
+        }
+    )
 }
 
 @Composable
@@ -377,65 +445,5 @@ private fun EmptyState() {
         contentAlignment = Alignment.Center
     ) {
         Text(text = "No stock details available.")
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun StockDetailsScreenPreview() {
-    GrowwTheme {
-        StockDetailsContent(
-            stockDetails = CompanyOverviewResponse(
-                symbol = "AAPL",
-                assetType = "Equity",
-                name = "Apple Inc.",
-                description = "Apple Inc. is an American multinational technology company that specializes in consumer electronics...",
-                cik = "0000320193",
-                exchange = "NASDAQ",
-                currency = "USD",
-                country = "USA",
-                sector = "Technology",
-                industry = "Electronic Computers",
-                address = "One Apple Park Way, Cupertino, CA 95014",
-                fiscalYearEnd = "September",
-                latestQuarter = "2023-09-30",
-                marketCapitalization = "2770000000000",
-                ebitda = "125000000000",
-                peRatio = "27.77",
-                pegRatio = "2.10",
-                bookValue = "4.20",
-                dividendPerShare = "0.96",
-                dividendYield = "0.0054",
-                eps = "6.13",
-                revenuePerShareTTM = "19.24",
-                profitMargin = "0.247",
-                operatingMarginTTM = "0.300",
-                returnOnAssetsTTM = "0.180",
-                returnOnEquityTTM = "1.52",
-                revenueTTM = "383000000000",
-                grossProfitTTM = "170000000000",
-                dilutedEPSTTM = "6.13",
-                quarterlyEarningsGrowthYOY = "0.15",
-                quarterlyRevenueGrowthYOY = "0.05",
-                analystTargetPrice = "195.00",
-                trailingPE = "27.77",
-                forwardPE = "25.00",
-                priceToSalesRatioTTM = "7.25",
-                priceToBookRatio = "14.50",
-                evToRevenue = "7.15",
-                evToEbitda = "19.50",
-                beta = "1.308",
-                fiftyTwoWeekHigh = "197.96",
-                fiftyTwoWeekLow = "123.64",
-                fiftyDayMovingAverage = "178.50",
-                twoHundredDayMovingAverage = "172.00",
-                sharesOutstanding = "15600000000",
-                sharesFloat = "15500000000",
-                percentInsiders = "0.07",
-                percentInstitutions = "58.00",
-                dividendDate = "2023-11-16",
-                exDividendDate = "2023-11-10"
-            )
-        )
     }
 }

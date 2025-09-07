@@ -103,6 +103,10 @@ dependencies {
     // Gson for JSON parsing
     implementation("com.google.code.gson:gson:2.11.0")
 
+    //Graph
+    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
+
+
     // LiveData with Compose
     implementation("androidx.compose.runtime:runtime-livedata:1.7.6")
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.7")

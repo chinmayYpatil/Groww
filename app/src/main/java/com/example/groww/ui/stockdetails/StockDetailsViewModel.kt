@@ -38,7 +38,8 @@ class StockDetailsViewModel @Inject constructor(
             try {
                 val details = getStockDetailsUseCase.execute(symbol, apiKey)
                 if (details != null) {
-                    _uiState.value = StockDetailsState.FullDetails(details)
+                    val timeSeriesData = stockRepository.getDailyTimeSeries(symbol, apiKey)
+                    _uiState.value = StockDetailsState.FullDetails(details, timeSeriesData)
                 } else {
                     val stockInfo = stockRepository.getStockInfoFromCache(symbol)
                     if (stockInfo != null) {

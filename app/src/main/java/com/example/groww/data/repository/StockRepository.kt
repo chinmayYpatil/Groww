@@ -6,6 +6,7 @@ import com.example.groww.data.model.network.CompanyOverviewResponse
 import com.example.groww.data.model.network.StockInfo
 import com.example.groww.data.model.network.TickerSearchResponse
 import com.example.groww.data.model.network.TopGainersLosersResponse
+import com.example.groww.data.model.network.TimeSeriesResponse
 import com.example.groww.data.local.database.dao.TopGainersLosersDao
 import com.example.groww.data.local.database.entities.TopGainersLosersEntity
 import kotlinx.coroutines.sync.Mutex
@@ -30,6 +31,7 @@ class StockRepository @Inject constructor(
     private var topGainersLosersCache: Pair<TopGainersLosersResponse, Long>? = null
     private var companyOverviewCache: MutableMap<String, Pair<CompanyOverviewResponse, Long>> = mutableMapOf()
     private var tickerSearchCache: MutableMap<String, Pair<TickerSearchResponse, Long>> = mutableMapOf()
+    private var timeSeriesCache: MutableMap<String, Pair<TimeSeriesResponse, Long>> = mutableMapOf()
 
     // Use mutex to ensure thread-safe cache access
     private val mutex = Mutex()
@@ -139,6 +141,34 @@ class StockRepository @Inject constructor(
                 response
             } catch (e: Exception) {
                 Log.e(TAG, "Search API call failed for: $keywords", e)
+                handleNetworkError(e)
+            }
+        }
+    }
+
+    suspend fun getDailyTimeSeries(symbol: String, apiKey: String): TimeSeriesResponse? {
+        return mutex.withLock {
+            Log.d(TAG, "Fetching daily time series for symbol: $symbol")
+
+            val cachedData = timeSeriesCache[symbol]
+            if (cachedData != null && isCacheValid(cachedData.second)) {
+                Log.d(TAG, "Using cached time series data for $symbol")
+                return cachedData.first
+            }
+
+            // Fetch from network
+            try {
+                Log.d(TAG, "Fetching fresh time series data from API for $symbol")
+                val response = apiService.getDailyTimeSeries(symbol, apiKey)
+                if (response.timeSeriesDaily.isNullOrEmpty()) {
+                    Log.w(TAG, "API returned empty time series response for symbol: $symbol")
+                    return null
+                }
+                Log.d(TAG, "Time series API call successful for $symbol")
+                timeSeriesCache[symbol] = Pair(response, System.currentTimeMillis())
+                response
+            } catch (e: Exception) {
+                Log.e(TAG, "Time series API call failed for $symbol", e)
                 handleNetworkError(e)
             }
         }
