@@ -50,6 +50,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.ui.text.style.TextOverflow
 import coil3.compose.AsyncImage
+import com.example.groww.ui.news.NewsTickerCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -171,7 +172,7 @@ private fun NewsTicker(news: List<Article>, onViewAllNewsClick: () -> Unit) {
                 scrollState.maxValue,
                 animationSpec = infiniteRepeatable(
                     animation = tween(
-                        durationMillis = news.size * 4000, // Slower speed
+                        durationMillis = news.size * 10000, // Slower speed
                         easing = LinearEasing
                     ),
                     repeatMode = RepeatMode.Restart
@@ -220,58 +221,11 @@ private fun NewsTicker(news: List<Article>, onViewAllNewsClick: () -> Unit) {
                 // Duplicate the list to ensure continuous scrolling
                 val newsToDisplay = news + news + news
                 newsToDisplay.forEach { article ->
-                    NewsCard(
+                    NewsTickerCard(
                         article = article,
                         onClick = { uriHandler.openUri(article.url) }
                     )
                 }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun NewsCard(article: Article, onClick: () -> Unit) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier
-            .width(280.dp)
-            .height(180.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(4.dp),
-        shape = MaterialTheme.shapes.medium
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            AsyncImage(
-                model = article.bannerImage ?: "https://placehold.co/600x400/E5E7EB/4B5563?text=No+Image",
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(100.dp),
-                alignment = Alignment.Center
-            )
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp)
-            ) {
-                Text(
-                    text = article.title,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = article.source,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         }
     }

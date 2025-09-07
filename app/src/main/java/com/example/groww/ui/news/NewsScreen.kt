@@ -27,7 +27,7 @@ import coil3.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NewsCard(
+fun NewsScreen(
     viewModel: ExploreViewModel = hiltViewModel(),
     onBackClick: () -> Unit
 ) {
@@ -98,14 +98,14 @@ private fun NewsList(news: List<Article>, onNewsClick: (String) -> Unit) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         items(news) { article ->
-            NewsCard(article = article, onClick = { onNewsClick(article.url) })
+            NewsDetailCard(article = article, onClick = { onNewsClick(article.url) })
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun NewsCard(article: Article, onClick: () -> Unit) {
+private fun NewsDetailCard(article: Article, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -168,6 +168,13 @@ private fun NewsCard(article: Article, onClick: () -> Unit) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = "Source: ${article.source}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Sentiment: ${article.overallSentimentLabel} (${"%.2f".format(article.overallSentimentScore)})",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Medium
