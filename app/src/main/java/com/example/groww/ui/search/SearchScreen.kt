@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.groww.data.model.network.BestMatch
 import com.example.groww.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -33,9 +35,11 @@ fun SearchScreen(
     var searchQuery by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
 
-    // TODO: Observe search results from ViewModel
-    val searchResults = remember { emptyList<String>() } // Placeholder
-    val isLoading by remember { mutableStateOf(false) }
+    // Correctly observe search results and loading state from ViewModel
+    val searchResults by viewModel.searchResults.observeAsState(emptyList())
+    val isLoading by viewModel.isLoading.observeAsState(false)
+    val error by viewModel.error.observeAsState(null)
+
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
@@ -51,14 +55,18 @@ fun SearchScreen(
             query = searchQuery,
             onQueryChange = {
                 searchQuery = it
-                // TODO: Trigger search in ViewModel
+                // Trigger search in ViewModel whenever the query changes
+                viewModel.searchStocks(it, "demo") // Use your own API key here
             },
             onBackClick = onBackClick,
             focusRequester = focusRequester
         )
 
         // Search Content
-        if (searchQuery.isEmpty()) {
+        if (error != null) {
+            // New state to handle errors
+            SearchErrorState(error = error!!)
+        } else if (searchQuery.isEmpty()) {
             SearchEmptyState()
         } else if (isLoading) {
             SearchLoadingState()
@@ -286,9 +294,39 @@ private fun SearchNoResultsState(query: String) {
     }
 }
 
+// New state to handle errors
+@Composable
+private fun SearchErrorState(error: String) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "❌",
+                style = MaterialTheme.typography.displayMedium
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Error Occurred",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.error
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = error,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+// Update this composable to accept a List<BestMatch>
 @Composable
 private fun SearchResultsList(
-    results: List<String>,
+    results: List<BestMatch>,
     onStockClick: (String) -> Unit
 ) {
     LazyColumn(
@@ -297,20 +335,26 @@ private fun SearchResultsList(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(results) { result ->
-            // TODO: Implement search result item
             Card(
-                onClick = { onStockClick(result) },
+                onClick = { onStockClick(result.symbol) },
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 ),
                 shape = MaterialTheme.shapes.medium
             ) {
-                Text(
-                    text = result,
-                    modifier = Modifier.padding(16.dp),
-                    style = MaterialTheme.typography.bodyLarge
-                )
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = result.symbol,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = result.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }

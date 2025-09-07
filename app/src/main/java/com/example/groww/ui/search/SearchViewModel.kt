@@ -50,10 +50,10 @@ class SearchViewModel @Inject constructor(
 
             } catch (e: Exception) {
                 _error.value = when {
+                    e.message?.contains("API limit reached", ignoreCase = true) == true ->
+                        "Sorry, API limit exhausted. Please search for tesco as it's available in the demo API."
                     e.message?.contains("network", ignoreCase = true) == true ->
                         "Network error. Please check your connection."
-                    e.message?.contains("api", ignoreCase = true) == true ->
-                        "API limit reached. Please try again later."
                     else -> "Search failed. Please try again."
                 }
                 _searchResults.value = emptyList()

@@ -136,6 +136,10 @@ class StockRepository @Inject constructor(
             try {
                 Log.d(TAG, "Fetching fresh search results from API for: $keywords")
                 val response = apiService.searchSymbol(keywords, apiKey)
+                if (response.information != null) {
+                    // Throw a specific exception for API limit reached
+                    throw Exception("API limit reached.")
+                }
                 Log.d(TAG, "Search API call successful for: $keywords")
                 tickerSearchCache[keywords] = Pair(response, System.currentTimeMillis())
                 response

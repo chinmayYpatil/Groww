@@ -16,6 +16,7 @@ import com.example.groww.ui.explore.ExploreScreen
 import com.example.groww.ui.navigation.GrowwBottomNavigation
 import com.example.groww.ui.stockdetails.StockDetailsScreen
 import com.example.groww.ui.theme.GrowwTheme
+import com.example.groww.ui.search.SearchScreen
 import com.example.groww.ui.viewall.ViewAllScreen
 import com.example.groww.ui.watchlist.WatchlistScreen
 import com.example.groww.ui.watchlist.WatchlistDetailScreen
@@ -72,7 +73,7 @@ fun AppNavHost(
                     navController.navigate("stock_details/$symbol")
                 },
                 onSearchClick = {
-                    // TODO: Navigate to search screen
+                    // Navigate to search screen
                     navController.navigate("search_route")
                 },
                 onViewAllClick = { type ->
@@ -124,7 +125,14 @@ fun AppNavHost(
         }
 
         composable("search_route") {
-            // TODO: Implement SearchScreen
+            SearchScreen(
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onStockClick = { symbol ->
+                    navController.navigate("stock_details/$symbol")
+                }
+            )
         }
 
         composable("view_all/{type}") { backStackEntry ->
