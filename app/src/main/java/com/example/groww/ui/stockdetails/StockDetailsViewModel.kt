@@ -1,3 +1,4 @@
+// groww/ui/stockdetails/StockDetailsViewModel.kt
 package com.example.groww.ui.stockdetails
 
 import android.util.Log
@@ -6,6 +7,7 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.groww.data.model.network.TimeSeriesResponse
 import com.example.groww.data.repository.StockRepository
 import com.example.groww.data.repository.WatchlistRepository
 import com.example.groww.domain.usecase.AddStockToWatchlistUseCase
@@ -40,6 +42,12 @@ class StockDetailsViewModel @Inject constructor(
     private val _actionMessage = MutableLiveData<String?>()
     val actionMessage: LiveData<String?> = _actionMessage
 
+    private val _timeSeriesData = MutableLiveData<TimeSeriesResponse?>()
+    val timeSeriesData: LiveData<TimeSeriesResponse?> = _timeSeriesData
+
+    private val _isLoadingTimeSeries = MutableLiveData<Boolean>()
+    val isLoadingTimeSeries: LiveData<Boolean> = _isLoadingTimeSeries
+
     val symbol: String = savedStateHandle.get<String>("symbol") ?: ""
 
     fun fetchStockDetails(apiKey: String) {
@@ -48,8 +56,7 @@ class StockDetailsViewModel @Inject constructor(
             try {
                 val details = getStockDetailsUseCase.execute(symbol, apiKey)
                 if (details != null) {
-                    val timeSeriesData = stockRepository.getDailyTimeSeries(symbol, apiKey)
-                    _uiState.value = StockDetailsState.FullDetails(details, timeSeriesData)
+                    _uiState.value = StockDetailsState.FullDetails(details, null)
                 } else {
                     val stockInfo = stockRepository.getStockInfoFromCache(symbol)
                     if (stockInfo != null) {
@@ -62,6 +69,32 @@ class StockDetailsViewModel @Inject constructor(
             } catch (e: Exception) {
                 _uiState.value = StockDetailsState.Error("Failed to load stock details: ${e.message}")
                 checkWatchlistStatus()
+            }
+        }
+    }
+
+    fun fetchTimeSeriesData(timeFrame: String, apiKey: String) {
+        viewModelScope.launch {
+            _isLoadingTimeSeries.value = true
+            try {
+                val response = when (timeFrame) {
+                    "1D" -> stockRepository.getIntradayTimeSeries(symbol, apiKey)
+                    "1W" -> stockRepository.getDailyTimeSeries(symbol, apiKey)
+                    "1M" -> stockRepository.getMonthlyAdjustedTimeSeries(symbol, apiKey)
+                    "3M" -> stockRepository.getDailyTimeSeries(symbol, apiKey)
+                    "1Y" -> stockRepository.getWeeklyTimeSeries(symbol, apiKey)
+                    else -> null
+                }
+                _timeSeriesData.value = when (response) {
+                    is com.example.groww.data.model.network.TimeSeriesResponse -> response
+                    is com.example.groww.data.model.network.TimeSeriesResponseAdjusted -> response.toTimeSeriesResponse()
+                    else -> null
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to fetch time series data for $timeFrame", e)
+                _timeSeriesData.value = null
+            } finally {
+                _isLoadingTimeSeries.value = false
             }
         }
     }
@@ -79,32 +112,22 @@ class StockDetailsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Remove stock from all watchlists when toggle is turned OFF
-     */
     fun removeFromAllWatchlists() {
         viewModelScope.launch {
             try {
                 Log.d(TAG, "Removing $symbol from all watchlists")
-
-                // Get all watchlists containing this stock
                 val stockWatchlists = watchlistRepository.getStockWatchlists(symbol)
                 Log.d(TAG, "Found ${stockWatchlists.size} watchlists containing $symbol")
-
-                // Remove from each watchlist
                 stockWatchlists.forEach { stockEntity ->
                     removeStockFromWatchlistUseCase.execute(stockEntity.watchlistId, symbol)
                     Log.d(TAG, "Removed $symbol from watchlist ${stockEntity.watchlistId}")
                 }
-
-                // Update status
                 _isStockInWatchlist.value = false
                 _actionMessage.value = if (stockWatchlists.isNotEmpty()) {
                     "Removed from ${stockWatchlists.size} watchlist${if (stockWatchlists.size > 1) "s" else ""}"
                 } else {
                     "Stock not found in any watchlist"
                 }
-
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to remove from watchlists", e)
                 _actionMessage.value = "Failed to remove from watchlist"

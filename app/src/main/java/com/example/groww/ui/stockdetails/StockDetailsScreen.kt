@@ -1,3 +1,4 @@
+// groww/ui/stockdetails/StockDetailsScreen.kt
 package com.example.groww.ui.stockdetails
 
 import androidx.compose.animation.Crossfade
@@ -30,6 +31,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.groww.BuildConfig
 import com.example.groww.data.model.network.CompanyOverviewResponse
 import com.example.groww.data.model.network.StockInfo
+import com.example.groww.data.model.network.TimeSeriesDailyData
 import com.example.groww.data.model.network.TimeSeriesResponse
 import com.example.groww.ui.theme.GrowwTheme
 import com.example.groww.ui.theme.NegativeRed
@@ -42,6 +44,22 @@ import com.github.mikephil.charting.data.LineDataSet
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.collections.ArrayList
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
+import kotlin.math.absoluteValue
+import com.github.mikephil.charting.formatter.ValueFormatter
+import com.github.mikephil.charting.components.AxisBase
+import com.github.mikephil.charting.components.XAxis
+import android.widget.TextView
+import android.view.LayoutInflater
+import android.widget.LinearLayout
+import com.github.mikephil.charting.highlight.Highlight
+import com.github.mikephil.charting.components.MarkerView
+import com.github.mikephil.charting.utils.MPPointF
+import android.content.Context
+import androidx.core.content.ContextCompat
+import com.example.groww.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,37 +71,34 @@ fun StockDetailsScreen(
     val uiState by viewModel.uiState.observeAsState(initial = StockDetailsState.Loading)
     val isStockInWatchlist by viewModel.isStockInWatchlist.observeAsState(initial = false)
     val actionMessage by viewModel.actionMessage.observeAsState()
+    val timeSeriesData by viewModel.timeSeriesData.observeAsState()
+    val isLoadingTimeSeries by viewModel.isLoadingTimeSeries.observeAsState(initial = false)
 
-    // State for showing the AddToWatchlistPopup
     var showAddToWatchlistPopup by remember { mutableStateOf(false) }
-
-    // State for toggle button
     var isToggled by remember { mutableStateOf(false) }
+    var selectedTimeFrame by remember { mutableStateOf("1D") }
 
-    // Context for showing snackbar
-    val context = LocalContext.current
-
-    // Get stock name for the popup
     val stockName = when (val state = uiState) {
         is StockDetailsState.FullDetails -> state.companyOverview.name ?: symbol
         is StockDetailsState.PartialDetails -> symbol
         else -> symbol
     }
 
-    // Update toggle state when watchlist status changes
     LaunchedEffect(isStockInWatchlist) {
         isToggled = isStockInWatchlist
     }
 
     LaunchedEffect(symbol) {
         viewModel.fetchStockDetails(BuildConfig.API_KEY)
+        viewModel.fetchTimeSeriesData(selectedTimeFrame, BuildConfig.API_KEY)
     }
 
-    // Show action message as snackbar
+    LaunchedEffect(selectedTimeFrame) {
+        viewModel.fetchTimeSeriesData(selectedTimeFrame, BuildConfig.API_KEY)
+    }
+
     LaunchedEffect(actionMessage) {
         actionMessage?.let { message ->
-            // Here you could show a Snackbar if you want
-            // For now, the message will just be logged
             viewModel.clearActionMessage()
         }
     }
@@ -98,15 +113,12 @@ fun StockDetailsScreen(
                     }
                 },
                 actions = {
-                    // Toggle Button for Watchlist
                     ToggleButton(
                         isToggled = isToggled,
                         onToggle = { newToggleState ->
                             if (newToggleState) {
-                                // When toggled ON, show popup to select watchlists
                                 showAddToWatchlistPopup = true
                             } else {
-                                // When toggled OFF, remove from all watchlists
                                 viewModel.removeFromAllWatchlists()
                             }
                             isToggled = newToggleState
@@ -139,14 +151,19 @@ fun StockDetailsScreen(
                 when (state) {
                     is StockDetailsState.Loading -> LoadingState()
                     is StockDetailsState.Error -> ErrorState(message = state.message, onRetry = { viewModel.fetchStockDetails(BuildConfig.API_KEY) })
-                    is StockDetailsState.FullDetails -> StockDetailsContent(stockDetails = state.companyOverview, timeSeriesData = state.timeSeriesData)
+                    is StockDetailsState.FullDetails -> StockDetailsContent(
+                        stockDetails = state.companyOverview,
+                        timeSeriesResponse = timeSeriesData,
+                        selectedTimeFrame = selectedTimeFrame,
+                        onTimeFrameSelected = { newTimeFrame -> selectedTimeFrame = newTimeFrame },
+                        isLoadingTimeSeries = isLoadingTimeSeries
+                    )
                     is StockDetailsState.PartialDetails -> PartialDetailsContent(stockInfo = state.stockInfo)
                     is StockDetailsState.Empty -> EmptyState()
                 }
             }
         }
 
-        // Show AddToWatchlistPopup when toggle is turned ON
         if (showAddToWatchlistPopup) {
             AddToWatchlistBottomSheet(
                 symbol = symbol,
@@ -206,7 +223,7 @@ private fun PartialDetailsContent(stockInfo: StockInfo) {
                     )
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    val isPositive = stockInfo.changeAmount.toFloatOrNull() ?: 0f >= 0
+                    val isPositive = stockInfo.changeAmount.toFloatOrNull()?.let { it >= 0 } ?: false
                     val changeColor = if (isPositive) PositiveGreen else NegativeRed
                     Text(
                         text = stockInfo.changeAmount,
@@ -235,7 +252,13 @@ private fun PartialDetailsContent(stockInfo: StockInfo) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun StockDetailsContent(stockDetails: CompanyOverviewResponse, timeSeriesData: TimeSeriesResponse?) {
+private fun StockDetailsContent(
+    stockDetails: CompanyOverviewResponse,
+    timeSeriesResponse: TimeSeriesResponse?,
+    selectedTimeFrame: String,
+    onTimeFrameSelected: (String) -> Unit,
+    isLoadingTimeSeries: Boolean
+) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -243,7 +266,6 @@ private fun StockDetailsContent(stockDetails: CompanyOverviewResponse, timeSerie
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         item {
-            // Price and Change
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -263,7 +285,6 @@ private fun StockDetailsContent(stockDetails: CompanyOverviewResponse, timeSerie
                     )
                 }
 
-                // Placeholder for price and change from a real-time API
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
                         text = "$177.15",
@@ -281,9 +302,36 @@ private fun StockDetailsContent(stockDetails: CompanyOverviewResponse, timeSerie
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Graph
-            if (timeSeriesData != null && timeSeriesData.timeSeriesDaily.isNotEmpty()) {
-                StockPriceGraph(timeSeriesData = timeSeriesData)
+            // Updated chart data logic
+            val chartData = remember(timeSeriesResponse, selectedTimeFrame) {
+                if (timeSeriesResponse != null) {
+                    val sortedTimeSeries = when (selectedTimeFrame) {
+                        "1D" -> timeSeriesResponse.timeSeriesIntraday?.toSortedMap()?.entries?.toList()?.takeLast(78)
+                        "1W" -> timeSeriesResponse.timeSeriesDaily?.toSortedMap()?.entries?.toList()?.takeLast(5)
+                        "1M" -> timeSeriesResponse.timeSeriesMonthly?.toSortedMap()?.entries?.toList()
+                        "3M" -> timeSeriesResponse.timeSeriesDaily?.toSortedMap()?.entries?.toList()?.takeLast(60)
+                        "1Y" -> timeSeriesResponse.timeSeriesWeekly?.toSortedMap()?.entries?.toList()?.takeLast(52)
+                        else -> emptyList()
+                    }
+                    sortedTimeSeries?.associate { it.key to it.value } ?: emptyMap()
+                } else {
+                    emptyMap()
+                }
+            }
+
+
+            if (isLoadingTimeSeries) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                        .background(Color.LightGray),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                }
+            } else if (chartData.isNotEmpty()) {
+                StockPriceGraph(timeSeriesData = chartData, selectedTimeFrame = selectedTimeFrame)
             } else {
                 Box(
                     modifier = Modifier
@@ -298,9 +346,11 @@ private fun StockDetailsContent(stockDetails: CompanyOverviewResponse, timeSerie
                 }
             }
 
+            Spacer(modifier = Modifier.height(16.dp))
+            TimeFrameSelector(selectedTimeFrame, onTimeFrameSelected)
+
             Spacer(modifier = Modifier.height(24.dp))
 
-            // About Section
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = "About ${stockDetails.name.orEmpty()}",
@@ -326,27 +376,58 @@ private fun StockDetailsContent(stockDetails: CompanyOverviewResponse, timeSerie
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Key Metrics
             KeyMetricsSection(stockDetails)
 
-            Spacer(modifier = Modifier.height(100.dp)) // Space for bottom navigation
+            Spacer(modifier = Modifier.height(100.dp))
         }
     }
 }
 
 @Composable
-private fun StockPriceGraph(timeSeriesData: TimeSeriesResponse) {
+private fun StockPriceGraph(timeSeriesData: Map<String, TimeSeriesDailyData>, selectedTimeFrame: String) {
     val entries = ArrayList<Entry>()
     val dates = ArrayList<String>()
-    val sortedDates = timeSeriesData.timeSeriesDaily.keys.sortedBy { it }
+    val sortedDates = timeSeriesData.keys.sortedBy { it }
 
     for ((index, date) in sortedDates.withIndex()) {
-        val data = timeSeriesData.timeSeriesDaily[date]
+        val data = timeSeriesData[date]
         if (data != null) {
             entries.add(Entry(index.toFloat(), data.close.toFloat()))
             dates.add(date)
         }
     }
+
+    val dateFormatter = remember(selectedTimeFrame) {
+        when (selectedTimeFrame) {
+            "1D" -> SimpleDateFormat("HH:mm", Locale.US)
+            else -> SimpleDateFormat("MMM d", Locale.US)
+        }
+    }
+
+    val xAxisValueFormatter = remember(dates, selectedTimeFrame) {
+        object : ValueFormatter() {
+            override fun getAxisLabel(value: Float, axis: AxisBase?): String {
+                val index = value.toInt()
+                return if (index >= 0 && index < dates.size) {
+                    val dateString = dates[index]
+                    val inputFormat = if (selectedTimeFrame == "1D") {
+                        SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+                    } else {
+                        SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                    }
+                    val date = inputFormat.parse(dateString)
+                    date?.let { dateFormatter.format(it) } ?: ""
+                } else {
+                    ""
+                }
+            }
+        }
+    }
+
+    val context = LocalContext.current
+    val primaryColor = MaterialTheme.colorScheme.primary.toArgb()
+    val onSurfaceVariantColor = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
+    val markerBackgroundColor = ContextCompat.getColor(context, com.example.groww.R.color.groww_text_secondary)
 
     AndroidView(
         modifier = Modifier
@@ -357,13 +438,26 @@ private fun StockPriceGraph(timeSeriesData: TimeSeriesResponse) {
             LineChart(context).apply {
                 description.isEnabled = false
                 legend.isEnabled = false
-                axisRight.isEnabled = false
+
+                xAxis.position = XAxis.XAxisPosition.BOTTOM
                 xAxis.setDrawGridLines(false)
-                xAxis.setDrawLabels(false)
+                xAxis.setDrawLabels(true)
+                xAxis.valueFormatter = xAxisValueFormatter
+                xAxis.textColor = onSurfaceVariantColor
+
                 axisLeft.setDrawGridLines(false)
+                axisLeft.textColor = onSurfaceVariantColor
+
+                axisRight.isEnabled = false
+
                 setTouchEnabled(true)
                 setPinchZoom(true)
                 isDragEnabled = true
+
+                // Attach custom marker view
+                val markerView = CustomMarkerView(context, com.example.groww.R.layout.custom_marker_view_layout, dates, selectedTimeFrame)
+                markerView.chartView = this
+                marker = markerView
             }
         },
         update = { lineChart ->
@@ -378,11 +472,91 @@ private fun StockPriceGraph(timeSeriesData: TimeSeriesResponse) {
             dataSet.setDrawValues(false)
             dataSet.mode = LineDataSet.Mode.CUBIC_BEZIER
 
+            // Enable highlighting for the marker
+            dataSet.setDrawHighlightIndicators(true)
+            dataSet.highLightColor = primaryColor
+            dataSet.isHighlightEnabled = true
+            dataSet.setDrawVerticalHighlightIndicator(true)
+
             val lineData = LineData(dataSet)
             lineChart.data = lineData
             lineChart.invalidate()
         }
     )
+}
+
+// Custom MarkerView class
+class CustomMarkerView(
+    context: Context,
+    layoutResource: Int,
+    private val dates: List<String>,
+    private val selectedTimeFrame: String
+) : MarkerView(context, layoutResource) {
+
+    private val tvContent: TextView = findViewById(com.example.groww.R.id.tvContent)
+    private val tvPrice: TextView = findViewById(com.example.groww.R.id.tvPrice)
+
+    private val dateFormatter = when (selectedTimeFrame) {
+        "1D" -> SimpleDateFormat("MMM d, HH:mm", Locale.US)
+        else -> SimpleDateFormat("MMM d, yyyy", Locale.US)
+    }
+
+    override fun refreshContent(e: Entry?, highlight: Highlight?) {
+        if (e != null) {
+            val dateIndex = e.x.toInt()
+            val price = e.y
+
+            val dateString = if (dateIndex >= 0 && dateIndex < dates.size) {
+                val inputFormat = if (selectedTimeFrame == "1D") {
+                    SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+                } else {
+                    SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                }
+                val date = inputFormat.parse(dates[dateIndex])
+                date?.let { dateFormatter.format(it) } ?: "N/A"
+            } else {
+                "N/A"
+            }
+
+            tvContent.text = dateString
+            tvPrice.text = "$${"%.2f".format(price)}"
+        }
+        super.refreshContent(e, highlight)
+    }
+
+    override fun getOffset(): MPPointF {
+        return MPPointF(-(width / 2f), -height.toFloat() - 10)
+    }
+}
+
+@Composable
+private fun TimeFrameSelector(
+    selectedTimeFrame: String,
+    onTimeFrameSelected: (String) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.SpaceAround
+    ) {
+        val timeFrames = listOf("1D", "1W", "1M", "3M", "1Y")
+        timeFrames.forEach { timeFrame ->
+            val isSelected = selectedTimeFrame == timeFrame
+            OutlinedButton(
+                onClick = { onTimeFrameSelected(timeFrame) },
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                shape = MaterialTheme.shapes.extraSmall,
+                border = if (isSelected) ButtonDefaults.outlinedButtonBorder else ButtonDefaults.outlinedButtonBorder,
+                modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
+            ) {
+                Text(text = timeFrame)
+            }
+        }
+    }
 }
 
 @Composable
