@@ -88,6 +88,13 @@ fun AppNavHost(
                 },
                 onCreateWatchlist = {
                     // TODO: Navigate to create watchlist screen
+                    navController.navigate("create_watchlist")
+                },
+                onExploreStocks = {
+                    // Navigate to explore tab when user wants to find stocks
+                    navController.navigate("explore_route") {
+                        popUpTo("watchlist_route") { inclusive = false }
+                    }
                 }
             )
         }
@@ -114,6 +121,12 @@ fun AppNavHost(
                     navController.navigate("stock_details/$symbol")
                 }
             )
+        }
+
+        composable("create_watchlist") {
+            // TODO: Implement CreateWatchlistScreen
+            // For now, just pop back
+            // In a real implementation, this would be a screen to create a new watchlist
         }
     }
 }

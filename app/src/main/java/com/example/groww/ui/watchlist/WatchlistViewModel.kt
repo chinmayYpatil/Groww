@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.groww.data.local.database.entities.WatchlistEntity
 import com.example.groww.data.repository.WatchlistRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -18,7 +19,7 @@ class WatchlistViewModel @Inject constructor(
     private val _watchlists = MutableLiveData<List<WatchlistEntity>>()
     val watchlists: LiveData<List<WatchlistEntity>> = _watchlists
 
-    private val _isLoading = MutableLiveData<Boolean>()
+    private val _isLoading = MutableLiveData<Boolean>(false) // Start with false
     val isLoading: LiveData<Boolean> = _isLoading
 
     private val _error = MutableLiveData<String?>()
@@ -30,16 +31,23 @@ class WatchlistViewModel @Inject constructor(
 
     fun loadWatchlists() {
         viewModelScope.launch {
-            try {
-                _isLoading.value = true
-                _error.value = null
+            _isLoading.value = true
+            _error.value = null
 
-                watchlistRepository.getAllWatchlists().collect { watchlists ->
-                    _watchlists.value = watchlists
-                }
+            try {
+                watchlistRepository.getAllWatchlists()
+                    .catch { e ->
+                        _error.value = "Failed to load watchlists: ${e.message}"
+                        _watchlists.value = emptyList()
+                        _isLoading.value = false
+                    }
+                    .collect { watchlistsFromDb ->
+                        _watchlists.value = watchlistsFromDb
+                        _isLoading.value = false
+                    }
             } catch (e: Exception) {
                 _error.value = "Failed to load watchlists: ${e.message}"
-            } finally {
+                _watchlists.value = emptyList()
                 _isLoading.value = false
             }
         }
@@ -49,6 +57,7 @@ class WatchlistViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 watchlistRepository.createWatchlist(name)
+                // The Flow collection will automatically update the UI
             } catch (e: Exception) {
                 _error.value = "Failed to create watchlist: ${e.message}"
             }
@@ -59,6 +68,7 @@ class WatchlistViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 watchlistRepository.deleteWatchlist(watchlist)
+                // The Flow collection will automatically update the UI
             } catch (e: Exception) {
                 _error.value = "Failed to delete watchlist: ${e.message}"
             }

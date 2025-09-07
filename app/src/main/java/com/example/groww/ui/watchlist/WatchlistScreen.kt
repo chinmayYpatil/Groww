@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,7 +29,8 @@ import com.example.groww.ui.theme.*
 fun WatchlistScreen(
     viewModel: WatchlistViewModel = hiltViewModel(),
     onStockClick: (String) -> Unit = {},
-    onCreateWatchlist: () -> Unit = {}
+    onCreateWatchlist: () -> Unit = {},
+    onExploreStocks: () -> Unit = {} // Add this parameter
 ) {
     val watchlists by viewModel.watchlists.observeAsState(initial = emptyList())
     val isLoading by viewModel.isLoading.observeAsState(initial = false)
@@ -45,7 +47,10 @@ fun WatchlistScreen(
         when {
             isLoading -> LoadingState()
             error != null -> ErrorState(message = error!!, onRetry = { viewModel.loadWatchlists() })
-            watchlists.isEmpty() -> EmptyWatchlistState(onCreateWatchlist = onCreateWatchlist)
+            watchlists.isEmpty() -> EmptyWatchlistState(
+                onCreateWatchlist = onCreateWatchlist,
+                onExploreStocks = onExploreStocks // Pass the navigation callback
+            )
             else -> WatchlistContent(
                 watchlists = watchlists,
                 onWatchlistClick = {
@@ -191,7 +196,8 @@ private fun WatchlistTopAppBar() {
 
 @Composable
 private fun EmptyWatchlistState(
-    onCreateWatchlist: () -> Unit
+    onCreateWatchlist: () -> Unit,
+    onExploreStocks: () -> Unit // Add this parameter
 ) {
     Column(
         modifier = Modifier
@@ -200,7 +206,7 @@ private fun EmptyWatchlistState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Empty state illustration
+        // Empty state illustration with trending icon
         Box(
             modifier = Modifier
                 .size(120.dp)
@@ -211,7 +217,7 @@ private fun EmptyWatchlistState(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = Icons.Default.Star,
+                imageVector = Icons.Default.AddCircle,
                 contentDescription = null,
                 modifier = Modifier.size(60.dp),
                 tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
@@ -221,7 +227,7 @@ private fun EmptyWatchlistState(
         Spacer(modifier = Modifier.height(24.dp))
 
         Text(
-            text = "No Watchlists Yet",
+            text = "No Stocks in Watchlist",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
@@ -231,7 +237,7 @@ private fun EmptyWatchlistState(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "Create your first watchlist to track your favorite stocks and stay updated on their performance.",
+            text = "Start building your watchlist by adding stocks from the Explore page. Track your favorite stocks and monitor their performance in one place.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -240,8 +246,9 @@ private fun EmptyWatchlistState(
 
         Spacer(modifier = Modifier.height(32.dp))
 
+        // Primary action - Go to explore
         Button(
-            onClick = onCreateWatchlist,
+            onClick = onExploreStocks, // Use the navigation callback
             modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp),
@@ -251,13 +258,13 @@ private fun EmptyWatchlistState(
             shape = MaterialTheme.shapes.medium
         ) {
             Icon(
-                imageVector = Icons.Default.Add,
+                imageVector = Icons.Default.AddCircle,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "Create Your First Watchlist",
+                text = "Explore Stocks",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Medium
             )
@@ -265,18 +272,56 @@ private fun EmptyWatchlistState(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Secondary action - Create watchlist manually
         OutlinedButton(
-            onClick = { /* TODO: Browse popular stocks */ },
+            onClick = onCreateWatchlist,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp),
             shape = MaterialTheme.shapes.medium
         ) {
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "Browse Popular Stocks",
+                text = "Create Empty Watchlist",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary
             )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Help text
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            ),
+            shape = MaterialTheme.shapes.small
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Star,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "💡 Tip: Tap the star icon on any stock to add it to your watchlist!",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
