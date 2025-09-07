@@ -1,5 +1,13 @@
 package com.example.groww.ui.explore
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -11,8 +19,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,6 +29,7 @@ import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -36,7 +46,9 @@ fun ExploreScreen(
     viewModel: ExploreViewModel = hiltViewModel(),
     onStockClick: (String) -> Unit = {},
     onSearchClick: () -> Unit = {},
-    onViewAllClick: (String) -> Unit = {}
+    onViewAllClick: (String) -> Unit = {},
+    darkTheme: Boolean,
+    onThemeToggle: () -> Unit
 ) {
     val topGainers by viewModel.topGainers.observeAsState(initial = emptyList())
     val topLosers by viewModel.topLosers.observeAsState(initial = emptyList())
@@ -55,7 +67,9 @@ fun ExploreScreen(
     ) {
         // Custom Top App Bar with Gradient
         GrowwTopAppBar(
-            onSearchClick = onSearchClick
+            onSearchClick = onSearchClick,
+            darkTheme = darkTheme,
+            onThemeToggle = onThemeToggle
         )
 
         // Main Content
@@ -120,8 +134,6 @@ fun ExploreScreen(
             IBMDemoSection(
                 onStockClick = onStockClick
             )
-
-            Spacer(modifier = Modifier.height(100.dp)) // Space for bottom navigation
         }
     }
 }
@@ -265,8 +277,16 @@ private fun IBMDemoSection(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun GrowwTopAppBar(
-    onSearchClick: () -> Unit
+    onSearchClick: () -> Unit,
+    darkTheme: Boolean,
+    onThemeToggle: () -> Unit
 ) {
+    val rotation by animateFloatAsState(
+        targetValue = if (darkTheme) 360f else 0f,
+        animationSpec = tween(durationMillis = 500),
+        label = "theme_toggle_rotation"
+    )
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -292,7 +312,7 @@ private fun GrowwTopAppBar(
                     color = Color.White.copy(alpha = 0.9f)
                 )
                 Text(
-                    text = "Groww Stocks",
+                    text = "Groww",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -317,15 +337,16 @@ private fun GrowwTopAppBar(
                 }
 
                 IconButton(
-                    onClick = { /* TODO: Implement notifications */ },
+                    onClick = onThemeToggle,
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
                         .background(Color.White.copy(alpha = 0.2f))
+                        .rotate(rotation)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Notifications,
-                        contentDescription = "Notifications",
+                        imageVector = if (darkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+                        contentDescription = "Toggle Theme",
                         tint = Color.White
                     )
                 }
@@ -415,10 +436,16 @@ private fun VerticalStockSection(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(stocks) { stock ->
-                    StockCard(
-                        stock = stock,
-                        onClick = onStockClick
-                    )
+                    AnimatedVisibility(
+                        visible = true, // The parent LazyGrid manages visibility
+                        enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
+                        exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 })
+                    ) {
+                        StockCard(
+                            stock = stock,
+                            onClick = onStockClick
+                        )
+                    }
                 }
             }
         }
@@ -458,11 +485,17 @@ private fun HorizontalStockSection(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(stocks) { stock ->
-                    StockCard(
-                        stock = stock,
-                        onClick = onStockClick,
-                        modifier = Modifier.width(160.dp)
-                    )
+                    AnimatedVisibility(
+                        visible = true, // The parent LazyRow manages visibility
+                        enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
+                        exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 })
+                    ) {
+                        StockCard(
+                            stock = stock,
+                            onClick = onStockClick,
+                            modifier = Modifier.width(160.dp)
+                        )
+                    }
                 }
             }
         }

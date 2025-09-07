@@ -1,5 +1,6 @@
 package com.example.groww.ui.stockdetails
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -134,18 +135,20 @@ fun StockDetailsScreen(
                 .padding(innerPadding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            when (val state = uiState) {
-                is StockDetailsState.Loading -> LoadingState()
-                is StockDetailsState.Error -> ErrorState(message = state.message, onRetry = { viewModel.fetchStockDetails(BuildConfig.API_KEY) })
-                is StockDetailsState.FullDetails -> StockDetailsContent(stockDetails = state.companyOverview, timeSeriesData = state.timeSeriesData)
-                is StockDetailsState.PartialDetails -> PartialDetailsContent(stockInfo = state.stockInfo)
-                is StockDetailsState.Empty -> EmptyState()
+            Crossfade(targetState = uiState, label = "stock_details_crossfade") { state ->
+                when (state) {
+                    is StockDetailsState.Loading -> LoadingState()
+                    is StockDetailsState.Error -> ErrorState(message = state.message, onRetry = { viewModel.fetchStockDetails(BuildConfig.API_KEY) })
+                    is StockDetailsState.FullDetails -> StockDetailsContent(stockDetails = state.companyOverview, timeSeriesData = state.timeSeriesData)
+                    is StockDetailsState.PartialDetails -> PartialDetailsContent(stockInfo = state.stockInfo)
+                    is StockDetailsState.Empty -> EmptyState()
+                }
             }
         }
 
         // Show AddToWatchlistPopup when toggle is turned ON
         if (showAddToWatchlistPopup) {
-            AddToWatchlistPopup(
+            AddToWatchlistBottomSheet(
                 symbol = symbol,
                 stockName = stockName,
                 onDismiss = {

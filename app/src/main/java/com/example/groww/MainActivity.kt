@@ -7,6 +7,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -28,9 +32,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            GrowwTheme {
-                GrowwApp()
-            }
+            GrowwApp()
         }
     }
 }
@@ -39,20 +41,25 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun GrowwApp() {
     val navController = rememberNavController()
+    var darkTheme by rememberSaveable { mutableStateOf(false) }
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Scaffold(
-            bottomBar = {
-                GrowwBottomNavigation(navController = navController)
+    GrowwTheme(darkTheme = darkTheme) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Scaffold(
+                bottomBar = {
+                    GrowwBottomNavigation(navController = navController)
+                }
+            ) { innerPadding ->
+                AppNavHost(
+                    navController = navController,
+                    modifier = Modifier.padding(innerPadding),
+                    darkTheme = darkTheme,
+                    onThemeToggle = { darkTheme = !darkTheme }
+                )
             }
-        ) { innerPadding ->
-            AppNavHost(
-                navController = navController,
-                modifier = Modifier.padding(innerPadding)
-            )
         }
     }
 }
@@ -60,7 +67,9 @@ fun GrowwApp() {
 @Composable
 fun AppNavHost(
     navController: NavHostController,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    darkTheme: Boolean,
+    onThemeToggle: () -> Unit
 ) {
     NavHost(
         navController = navController,
@@ -78,7 +87,9 @@ fun AppNavHost(
                 },
                 onViewAllClick = { type ->
                     navController.navigate("view_all/$type")
-                }
+                },
+                darkTheme = darkTheme,
+                onThemeToggle = onThemeToggle
             )
         }
 

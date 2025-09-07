@@ -106,6 +106,8 @@ dependencies {
     //Graph
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
 
+    //icon
+    implementation("androidx.compose.material:material-icons-extended")
 
     // LiveData with Compose
     implementation("androidx.compose.runtime:runtime-livedata:1.7.6")

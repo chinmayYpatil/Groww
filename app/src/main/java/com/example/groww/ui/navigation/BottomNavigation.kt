@@ -1,8 +1,9 @@
 package com.example.groww.ui.navigation
 
 
-//import androidx.compose.material.icons.filled.StarBorder
-//import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavController
@@ -10,17 +11,21 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 
 sealed class BottomNavItem(
     val route: String,
-    val label: String
+    val label: String,
+    val selectedIcon: androidx.compose.ui.graphics.vector.ImageVector,
+    val unselectedIcon: androidx.compose.ui.graphics.vector.ImageVector
 ) {
     object Explore : BottomNavItem(
         route = "explore_route",
-        label = "Stocks"
+        label = "Stocks",
+        selectedIcon = Icons.Filled.Star,
+        unselectedIcon = Icons.Outlined.Star
     )
 
     object Watchlist : BottomNavItem(
         route = "watchlist_route",
-//        selectedIcon = Icons.Filled.StarBorder,
-//        unselectedIcon = Icons.Outlined.StarBorder,
+        selectedIcon = Icons.Filled.Star,
+        unselectedIcon = Icons.Outlined.Star,
         label = "Watchlist"
     )
 }
@@ -44,10 +49,10 @@ fun GrowwBottomNavigation(
 
             NavigationBarItem(
                 icon = {
-//                    Icon(
-//                        imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
-//                        contentDescription = item.label
-//                    )
+                    Icon(
+                        imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
+                        contentDescription = item.label
+                    )
                 },
                 label = {
                     Text(

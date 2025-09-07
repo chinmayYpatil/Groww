@@ -1,6 +1,7 @@
 package com.example.groww.ui.search
 
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -56,27 +57,30 @@ fun SearchScreen(
             onQueryChange = {
                 searchQuery = it
                 // Trigger search in ViewModel whenever the query changes
-                viewModel.searchStocks(it, "demo") // Use your own API key here
+                viewModel.searchStocks(it, "5HFMVL6MZO17AG9T") // Use your own API key here
             },
             onBackClick = onBackClick,
             focusRequester = focusRequester
         )
 
         // Search Content
-        if (error != null) {
-            // New state to handle errors
-            SearchErrorState(error = error!!)
-        } else if (searchQuery.isEmpty()) {
-            SearchEmptyState()
-        } else if (isLoading) {
-            SearchLoadingState()
-        } else if (searchResults.isEmpty()) {
-            SearchNoResultsState(query = searchQuery)
-        } else {
-            SearchResultsList(
-                results = searchResults,
-                onStockClick = onStockClick
-            )
+        Crossfade(targetState = when {
+            error != null -> "Error"
+            searchQuery.isEmpty() -> "Empty"
+            isLoading -> "Loading"
+            searchResults.isEmpty() -> "NoResults"
+            else -> "Results"
+        }, label = "search_content_crossfade") { screenState ->
+            when (screenState) {
+                "Error" -> SearchErrorState(error = error!!)
+                "Empty" -> SearchEmptyState(onStockClick)
+                "Loading" -> SearchLoadingState()
+                "NoResults" -> SearchNoResultsState(query = searchQuery)
+                "Results" -> SearchResultsList(
+                    results = searchResults,
+                    onStockClick = onStockClick
+                )
+            }
         }
     }
 }
@@ -151,7 +155,7 @@ private fun SearchTopAppBar(
 }
 
 @Composable
-private fun SearchEmptyState() {
+private fun SearchEmptyState(onStockClick: (String) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -219,7 +223,7 @@ private fun SearchEmptyState() {
 
                 popularStocks.forEach { stock ->
                     Surface(
-                        onClick = { /* TODO: Handle popular stock click */ },
+                        onClick = { onStockClick(stock) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp),

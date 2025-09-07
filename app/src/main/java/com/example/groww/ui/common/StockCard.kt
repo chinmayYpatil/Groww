@@ -5,8 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-//import androidx.compose.material.icons.filled.TrendingDown
-//import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.TrendingDown
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -30,7 +30,7 @@ fun StockCard(
 ) {
     val isPositive = !stock.changeAmount.startsWith("-")
     val changeColor = if (isPositive) PositiveGreen else NegativeRed
-//    val trendIcon = if (isPositive) Icons.Default.TrendingUp else Icons.Default.TrendingDown
+    val trendIcon = if (isPositive) Icons.Default.TrendingUp else Icons.Default.TrendingDown
 
     Card(
         onClick = { onClick(stock.ticker) },
@@ -105,12 +105,12 @@ fun StockCard(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-//                        Icon(
-//                            imageVector = trendIcon,
-//                            contentDescription = if (isPositive) "Trending Up" else "Trending Down",
-//                            tint = changeColor,
-//                            modifier = Modifier.size(14.dp)
-//                        )
+                        Icon(
+                            imageVector = trendIcon,
+                            contentDescription = if (isPositive) "Trending Up" else "Trending Down",
+                            tint = changeColor,
+                            modifier = Modifier.size(14.dp)
+                        )
 
                         Text(
                             text = "${if (isPositive) "+" else ""}${stock.changeAmount}",
