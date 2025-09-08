@@ -1,10 +1,8 @@
 package com.example.groww.ui.news
 
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
@@ -35,6 +33,9 @@ fun NewsCard(
     val isLoading by viewModel.isLoading.observeAsState(initial = true)
     val error by viewModel.error.observeAsState()
     val uriHandler = LocalUriHandler.current
+
+    // Create scroll state for parallax effect
+    val scrollState = rememberLazyListState()
 
     LaunchedEffect(Unit) {
         // ViewModel might have already fetched the news on the Explore screen,
@@ -84,30 +85,36 @@ fun NewsCard(
                     onRetry = { viewModel.fetchTopStocks(BuildConfig.API_KEY) }
                 )
                 newsFeed.isEmpty() -> EmptyState()
-                else -> NewsList(news = newsFeed, onNewsClick = { url -> uriHandler.openUri(url) })
+                else -> {
+                    // Use parallax news list instead of regular list
+                    ParallaxNewsList(
+                        modifier = Modifier.fillMaxSize(),
+                        news = newsFeed,
+                        scrollState = scrollState,
+                        onNewsClick = { url -> uriHandler.openUri(url) },
+                        newsCardContent = { article, onClick, modifier ->
+                            NewsCardItem(
+                                modifier = modifier,
+                                article = article,
+                                onClick = onClick
+                            )
+                        }
+                    )
+                }
             }
-        }
-    }
-}
-
-@Composable
-private fun NewsList(news: List<Article>, onNewsClick: (String) -> Unit) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        items(news) { article ->
-            NewsCard(article = article, onClick = { onNewsClick(article.url) })
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun NewsCard(article: Article, onClick: () -> Unit) {
+private fun NewsCardItem(
+    modifier: Modifier = Modifier,
+    article: Article,
+    onClick: () -> Unit
+) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
