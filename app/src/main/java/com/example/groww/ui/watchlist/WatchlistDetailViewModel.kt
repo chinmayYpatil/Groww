@@ -115,7 +115,6 @@ class WatchlistDetailViewModel @Inject constructor(
                         }
                     }
                 } catch (e: Exception) {
-                    // If individual stock fails, create basic info
                     stockDetailsMap[stockEntity.symbol] = Stock(
                         symbol = stockEntity.symbol,
                         name = stockEntity.name,
@@ -130,7 +129,6 @@ class WatchlistDetailViewModel @Inject constructor(
             _stockDetails.value = stockDetailsMap
 
         } catch (e: Exception) {
-            // Even if stock details fail, we can still show the watchlist
             _error.value = "Failed to load current stock prices: ${e.message}"
         } finally {
             _isLoading.value = false
@@ -141,7 +139,6 @@ class WatchlistDetailViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 removeStockFromWatchlistUseCase.execute(watchlistId, symbol)
-                // The Flow collection will automatically update the UI
             } catch (e: Exception) {
                 _error.value = "Failed to remove stock: ${e.message}"
             }

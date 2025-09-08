@@ -34,12 +34,9 @@ fun NewsCard(
     val error by viewModel.error.observeAsState()
     val uriHandler = LocalUriHandler.current
 
-    // Create scroll state for parallax effect
     val scrollState = rememberLazyListState()
 
     LaunchedEffect(Unit) {
-        // ViewModel might have already fetched the news on the Explore screen,
-        // but this ensures it's available and refreshed if needed.
         if (newsFeed.isEmpty()) {
             viewModel.fetchTopStocks(BuildConfig.API_KEY)
         }

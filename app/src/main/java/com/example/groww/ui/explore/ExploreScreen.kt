@@ -41,6 +41,9 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextOverflow
 import coil3.compose.AsyncImage
 import com.example.groww.ui.news.NewsTickerCard
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -176,10 +179,17 @@ fun ExploreScreen(
                     onStockClick = onStockClick
                 )
             }
-
-            // Bottom padding for better scrolling
-            Spacer(modifier = Modifier.height(100.dp))
         }
+    }
+}
+
+private fun getGreeting(): String {
+    val currentHour = LocalTime.now().hour
+    return when (currentHour) {
+        in 5..11 -> "Good Morning!"
+        in 12..16 -> "Good Afternoon!"
+        in 17..20 -> "Good Evening!"
+        else -> "Good Night!"
     }
 }
 
@@ -221,7 +231,7 @@ private fun OptimizedGrowwTopAppBar(
         ) {
             Column {
                 Text(
-                    text = "Good Morning!",
+                    text = getGreeting(),
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.White.copy(alpha = 0.9f)
                 )
@@ -463,7 +473,7 @@ private fun OptimizedNewsSection(
                 NewsEmptyState()
             }
             else -> {
-                // Simplified news ticker without complex animations
+                // Simplified ticker without complex animations for better performance
                 OptimizedNewsTicker(news = news)
             }
         }
@@ -664,7 +674,6 @@ private fun MemoizedIBMDemoSection(
     }
 }
 
-// Helper composables optimized for performance
 @Composable
 private fun LoadingGrid() {
     LazyVerticalGrid(

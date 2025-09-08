@@ -185,7 +185,6 @@ class AddToWatchlistViewModel @Inject constructor(
                     _actionStatus.value = statusMessages.joinToString(". ")
                     Log.d(TAG, "Operation completed: ${statusMessages.joinToString(". ")}")
 
-                    // Clear selections after successful addition
                     _selectedWatchlists.value = emptySet()
                 } else {
                     _actionStatus.value = "Please select a watchlist or create a new one"
@@ -199,13 +198,5 @@ class AddToWatchlistViewModel @Inject constructor(
                 _isAdding.value = false
             }
         }
-    }
-
-    fun clearStatus() {
-        _actionStatus.value = null
-    }
-
-    fun clearSelections() {
-        _selectedWatchlists.value = emptySet()
     }
 }

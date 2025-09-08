@@ -37,8 +37,6 @@ fun NewsScreen(
     val uriHandler = LocalUriHandler.current
 
     LaunchedEffect(Unit) {
-        // ViewModel might have already fetched the news on the Explore screen,
-        // but this ensures it's available and refreshed if needed.
         if (newsFeed.isEmpty()) {
             viewModel.fetchTopStocks(BuildConfig.API_KEY)
         }

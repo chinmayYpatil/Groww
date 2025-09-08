@@ -1,4 +1,3 @@
-// groww/ui/search/SearchScreen.kt
 package com.example.groww.ui.search
 
 
@@ -37,7 +36,6 @@ fun SearchScreen(
     var searchQuery by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
 
-    // Correctly observe search results and loading state from ViewModel
     val searchResults by viewModel.searchResults.observeAsState(emptyList())
     val isLoading by viewModel.isLoading.observeAsState(false)
     val error by viewModel.error.observeAsState(null)
@@ -299,7 +297,6 @@ private fun SearchNoResultsState(query: String) {
     }
 }
 
-// New state to handle errors
 @Composable
 private fun SearchErrorState(error: String) {
     Box(
@@ -328,7 +325,6 @@ private fun SearchErrorState(error: String) {
     }
 }
 
-// Update this composable to accept a List<BestMatch>
 @Composable
 private fun SearchResultsList(
     results: List<BestMatch>,

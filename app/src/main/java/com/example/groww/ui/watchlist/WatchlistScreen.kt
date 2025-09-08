@@ -24,14 +24,13 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.groww.data.local.database.entities.WatchlistEntity
 import com.example.groww.ui.common.CreateWatchlistPopup
-import com.example.groww.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WatchlistScreen(
     onWatchlistClick: (Long, String) -> Unit = { _, _ -> },
-    onCreateWatchlist: () -> Unit = {},
-    onExploreStocks: () -> Unit = {}
+    onExploreStocks: () -> Unit = {},
+    onCreateWatchlist: () -> Unit
 ) {
     val viewModel: WatchlistViewModel = hiltViewModel()
 

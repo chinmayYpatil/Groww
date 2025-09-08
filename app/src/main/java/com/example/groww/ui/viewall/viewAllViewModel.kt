@@ -36,8 +36,6 @@ class ViewAllViewModel @Inject constructor(
                     "gainers" -> getTopGainersUseCase.execute(apiKey)
                     "losers" -> getTopLosersUseCase.execute(apiKey)
                     "active" -> {
-                        // For most active, we can use the same endpoint but show all
-                        // In a real app, you might have a separate use case for this
                         getTopGainersUseCase.execute(apiKey)
                     }
                     else -> emptyList()

@@ -17,8 +17,8 @@ class SearchViewModel @Inject constructor(
     private val stockRepository: StockRepository
 ) : ViewModel() {
 
-    private val _searchResults = MutableLiveData<List<BestMatch>>()
-    val searchResults: LiveData<List<BestMatch>> = _searchResults
+    private val _searchResults = MutableLiveData<List<BestMatch>?>()
+    val searchResults: LiveData<List<BestMatch>> = _searchResults as LiveData<List<BestMatch>>
 
     private val _isLoading = MutableLiveData<Boolean>()
     val isLoading: LiveData<Boolean> = _isLoading
@@ -61,15 +61,5 @@ class SearchViewModel @Inject constructor(
                 _isLoading.value = false
             }
         }
-    }
-
-    fun clearSearch() {
-        searchJob?.cancel()
-        _searchResults.value = emptyList()
-        _error.value = null
-    }
-
-    fun clearError() {
-        _error.value = null
     }
 }

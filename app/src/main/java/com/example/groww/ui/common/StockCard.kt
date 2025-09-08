@@ -29,7 +29,6 @@ fun StockCard(
     onClick: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    // Memoize expensive calculations to prevent recompositions
     val isPositive = remember(stock.changeAmount) { !stock.changeAmount.startsWith("-") }
     val changeColor = remember(isPositive) { if (isPositive) PositiveGreen else NegativeRed }
     val trendIcon = remember(isPositive) { if (isPositive) Icons.Default.TrendingUp else Icons.Default.TrendingDown }
@@ -176,36 +175,3 @@ private fun formatVolume(volume: String): String {
 }
 
 private fun Double.format(digits: Int) = "%.${digits}f".format(this)
-
-@Preview(showBackground = true)
-@Composable
-fun StockCardPreview() {
-    GrowwTheme {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            StockCard(
-                stock = StockInfo(
-                    ticker = "AAPL",
-                    price = "175.43",
-                    changeAmount = "2.15",
-                    changePercentage = "1.24%",
-                    volume = "54832000"
-                )
-            )
-
-            StockCard(
-                stock = StockInfo(
-                    ticker = "TSLA",
-                    price = "195.89",
-                    changeAmount = "-8.76",
-                    changePercentage = "-4.28%",
-                    volume = "98234567"
-                )
-            )
-        }
-    }
-}

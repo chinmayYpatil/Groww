@@ -9,7 +9,6 @@ class GetTopGainersUseCase @Inject constructor(
 ) {
     suspend fun execute(apiKey: String) = repository.getTopGainersLosers(apiKey).topGainers
 
-    // New function to get the entire response
     suspend fun getTopGainersLosersResponse(apiKey: String): TopGainersLosersResponse {
         return repository.getTopGainersLosers(apiKey)
     }

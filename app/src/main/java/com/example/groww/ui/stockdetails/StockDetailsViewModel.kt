@@ -50,7 +50,6 @@ class StockDetailsViewModel @Inject constructor(
 
     val symbol: String = savedStateHandle.get<String>("symbol") ?: ""
 
-    // Job management for better performance
     private var fetchDetailsJob: Job? = null
     private var fetchTimeSeriesJob: Job? = null
     private var watchlistJob: Job? = null
@@ -154,7 +153,6 @@ class StockDetailsViewModel @Inject constructor(
         _actionMessage.value = null
     }
 
-    // Optimized setter methods to prevent unnecessary LiveData emissions
     private fun setUiStateIfChanged(newState: StockDetailsState) {
         if (_uiState.value != newState) {
             _uiState.value = newState
@@ -187,7 +185,6 @@ class StockDetailsViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        // Clean up jobs when ViewModel is destroyed
         fetchDetailsJob?.cancel()
         fetchTimeSeriesJob?.cancel()
         watchlistJob?.cancel()
