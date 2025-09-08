@@ -74,6 +74,41 @@ class AddToWatchlistViewModel @Inject constructor(
         _newWatchlistName.value = name
     }
 
+    /**
+     * Add stock to a single watchlist immediately when checkbox is checked
+     */
+    fun addStockToSingleWatchlist(watchlistId: Long, symbol: String, stockName: String) {
+        viewModelScope.launch {
+            try {
+                Log.d(TAG, "Adding stock $symbol to watchlist $watchlistId")
+
+                // Check if stock already exists in this watchlist
+                val existingStockWatchlists = watchlistRepository.getStockWatchlists(symbol)
+                val alreadyExists = existingStockWatchlists.any { it.watchlistId == watchlistId }
+
+                if (alreadyExists) {
+                    val watchlistName = _watchlists.value?.find { it.id == watchlistId }?.name ?: "watchlist"
+                    _actionStatus.value = "Already in $watchlistName"
+                    Log.d(TAG, "Stock already exists in watchlist $watchlistId")
+                } else {
+                    // Add to watchlist
+                    addStockToWatchlistUseCase.execute(watchlistId, symbol, stockName)
+                    val watchlistName = _watchlists.value?.find { it.id == watchlistId }?.name ?: "watchlist"
+                    _actionStatus.value = "Added to $watchlistName!"
+                    Log.d(TAG, "Successfully added stock to watchlist $watchlistId")
+                }
+
+            } catch (e: Exception) {
+                val errorMessage = "Failed to add stock: ${e.message}"
+                _actionStatus.value = errorMessage
+                Log.e(TAG, errorMessage, e)
+            }
+        }
+    }
+
+    /**
+     * Add stock to multiple selected watchlists at once
+     */
     fun addStockToWatchlists(symbol: String, stockName: String) {
         viewModelScope.launch {
             _isAdding.value = true
@@ -168,5 +203,9 @@ class AddToWatchlistViewModel @Inject constructor(
 
     fun clearStatus() {
         _actionStatus.value = null
+    }
+
+    fun clearSelections() {
+        _selectedWatchlists.value = emptySet()
     }
 }

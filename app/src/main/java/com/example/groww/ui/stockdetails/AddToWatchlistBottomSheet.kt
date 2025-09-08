@@ -75,6 +75,16 @@ fun AddToWatchlistBottomSheet(
 
             Spacer(modifier = Modifier.height(20.dp))
 
+            // Create New Watchlist Section
+            Text(
+                text = "Create New Watchlist",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -94,12 +104,21 @@ fun AddToWatchlistBottomSheet(
                     onClick = { viewModel.addStockToWatchlists(symbol, stockName) },
                     enabled = newWatchlistName.isNotBlank() && !isAdding
                 ) {
-                    Text("Add")
+                    Text("Create & Add")
                 }
             }
 
             if (watchlists.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(24.dp))
+
+                Text(
+                    text = "Add to Existing Watchlist",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
 
                 LazyColumn(modifier = Modifier.heightIn(max = 200.dp)) {
                     items(watchlists) { watchlist ->
@@ -107,14 +126,31 @@ fun AddToWatchlistBottomSheet(
                         WatchlistCheckboxItem(
                             watchlist = watchlist,
                             isChecked = selectedWatchlistIds.contains(watchlist.id),
-                            onCheckChanged = {
+                            onCheckChanged = { isChecked ->
                                 if (!isAlreadyInWatchlist) {
                                     viewModel.onWatchlistSelected(watchlist.id)
+
+                                    // Automatically add to watchlist when checked
+                                    if (isChecked && !selectedWatchlistIds.contains(watchlist.id)) {
+                                        viewModel.addStockToSingleWatchlist(watchlist.id, symbol, stockName)
+                                    }
                                 }
                             },
                             enabled = !isAdding && !isAlreadyInWatchlist,
                             isAlreadyAdded = isAlreadyInWatchlist
                         )
+                    }
+                }
+
+                // Add button for selected watchlists (if any are selected but not yet added)
+                if (selectedWatchlistIds.isNotEmpty() && !isAdding) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = { viewModel.addStockToWatchlists(symbol, stockName) },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isAdding
+                    ) {
+                        Text("Add to ${selectedWatchlistIds.size} Selected Watchlist${if (selectedWatchlistIds.size > 1) "s" else ""}")
                     }
                 }
             }
@@ -182,7 +218,8 @@ private fun WatchlistCheckboxItem(
     isChecked: Boolean,
     onCheckChanged: (Boolean) -> Unit,
     enabled: Boolean = true,
-    isAlreadyAdded: Boolean = false
+    isAlreadyAdded: Boolean = false,
+    showAsRadio: Boolean = false
 ) {
     Row(
         modifier = Modifier
@@ -198,7 +235,19 @@ private fun WatchlistCheckboxItem(
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp)
             )
+        } else if (showAsRadio) {
+            // Show radio button in immediate mode
+            RadioButton(
+                selected = isChecked,
+                onClick = { onCheckChanged(!isChecked) },
+                enabled = enabled,
+                colors = RadioButtonDefaults.colors(
+                    selectedColor = MaterialTheme.colorScheme.primary,
+                    unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            )
         } else {
+            // Show checkbox in batch mode
             Checkbox(
                 checked = isChecked,
                 onCheckedChange = onCheckChanged,
@@ -225,6 +274,12 @@ private fun WatchlistCheckboxItem(
                     text = "Already added",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
+                )
+            } else if (showAsRadio) {
+                Text(
+                    text = "Tap to add immediately",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
