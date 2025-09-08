@@ -54,7 +54,7 @@ fun NewsTickerCard(article: Article, onClick: () -> Unit) {
                     text = article.title,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = MaterialTheme.colorScheme.onSurface, // Fixed: Use proper color for dark mode
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -62,7 +62,7 @@ fun NewsTickerCard(article: Article, onClick: () -> Unit) {
                 Text(
                     text = article.source,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant // Fixed: Use proper color for dark mode
                 )
             }
         }

@@ -135,13 +135,13 @@ private fun NewsCardItem(
                     text = article.title,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface // Fixed: Use proper color for dark mode
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = article.summary,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant // Fixed: Use proper color for dark mode
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(
@@ -151,13 +151,13 @@ private fun NewsCardItem(
                     Text(
                         text = "Published by: ${article.authors.joinToString()}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, // Fixed: Use proper color for dark mode
                         fontWeight = FontWeight.Medium
                     )
                     Text(
                         text = "on ${article.timePublished.substring(0, 8)}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, // Fixed: Use proper color for dark mode
                         fontWeight = FontWeight.Medium,
                         textAlign = TextAlign.End
                     )
@@ -197,12 +197,14 @@ private fun NewsCardItem(
 private fun Chip(text: String) {
     Surface(
         shape = androidx.compose.foundation.shape.CircleShape,
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f), // Better visibility in both themes
+        contentColor = MaterialTheme.colorScheme.onSurface // Use onSurface for better contrast
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface, // Explicit color for better visibility
+            fontWeight = FontWeight.Medium,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
         )
     }

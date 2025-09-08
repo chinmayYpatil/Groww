@@ -17,7 +17,7 @@ sealed class BottomNavItem(
     val unselectedIcon: androidx.compose.ui.graphics.vector.ImageVector
 ) {
     object Stocks : BottomNavItem(
-        route = "stocks_route",
+        route = "explore_route",
         label = "Stocks",
         selectedIcon = Icons.Filled.Home,
         unselectedIcon = Icons.Outlined.Home
