@@ -67,8 +67,13 @@ fun ExploreScreen(
     val topLosers by viewModel.topLosers.observeAsState(initial = emptyList())
     val mostActivelyTraded by viewModel.mostActivelyTraded.observeAsState(initial = emptyList())
     val newsFeed by viewModel.newsFeed.observeAsState(initial = emptyList())
-    val isLoading by viewModel.isLoading.observeAsState(initial = false)
+
+    // Separate loading states
+    val isLoadingStocks by viewModel.isLoadingStocks.observeAsState(initial = false)
+    val isLoadingNews by viewModel.isLoadingNews.observeAsState(initial = false)
+
     val error by viewModel.error.observeAsState()
+    val newsError by viewModel.newsError.observeAsState()
 
     LaunchedEffect(Unit) {
         viewModel.fetchTopStocks(BuildConfig.API_KEY)
@@ -100,11 +105,11 @@ fun ExploreScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Error State
+            // Stock Error State (only for stocks)
             error?.let { errorMessage ->
                 ErrorCard(
                     message = errorMessage,
-                    onRetry = { viewModel.fetchTopStocks(BuildConfig.API_KEY) }
+                    onRetry = { viewModel.retryStockData(BuildConfig.API_KEY) }
                 )
                 Spacer(modifier = Modifier.height(16.dp))
             }
@@ -114,7 +119,7 @@ fun ExploreScreen(
                 title = "Top Gainers",
                 subtitle = "Stocks with highest gains today",
                 stocks = topGainers.take(4),
-                isLoading = isLoading,
+                isLoading = isLoadingStocks,
                 onStockClick = onStockClick,
                 onViewAllClick = { onViewAllClick("gainers") }
             )
@@ -126,7 +131,7 @@ fun ExploreScreen(
                 title = "Top Losers",
                 subtitle = "Stocks with highest losses today",
                 stocks = topLosers.take(4),
-                isLoading = isLoading,
+                isLoading = isLoadingStocks,
                 onStockClick = onStockClick,
                 onViewAllClick = { onViewAllClick("losers") }
             )
@@ -138,14 +143,20 @@ fun ExploreScreen(
                 title = "Most Actively Traded",
                 subtitle = "Stocks with the most volume today",
                 stocks = mostActivelyTraded,
-                isLoading = isLoading,
+                isLoading = isLoadingStocks,
                 onStockClick = onStockClick
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // News Ticker
-            NewsTicker(news = newsFeed, onViewAllNewsClick = onViewAllNewsClick)
+            // News Ticker with separate loading state
+            NewsSection(
+                news = newsFeed,
+                isLoadingNews = isLoadingNews,
+                newsError = newsError,
+                onViewAllNewsClick = onViewAllNewsClick,
+                onRetryNews = { viewModel.retryNewsData(BuildConfig.API_KEY) }
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -158,11 +169,186 @@ fun ExploreScreen(
 }
 
 @Composable
-private fun NewsTicker(news: List<Article>, onViewAllNewsClick: () -> Unit) {
-    if (news.isEmpty()) {
-        return
-    }
+private fun NewsSection(
+    news: List<Article>,
+    isLoadingNews: Boolean,
+    newsError: String?,
+    onViewAllNewsClick: () -> Unit,
+    onRetryNews: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Latest News",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+            if (!isLoadingNews && news.isNotEmpty()) {
+                TextButton(
+                    onClick = onViewAllNewsClick
+                ) {
+                    Text(
+                        text = "View All",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
 
+        Spacer(modifier = Modifier.height(12.dp))
+
+        when {
+            isLoadingNews -> {
+                NewsLoadingState()
+            }
+            newsError != null -> {
+                NewsErrorState(
+                    message = newsError,
+                    onRetry = onRetryNews
+                )
+            }
+            news.isEmpty() -> {
+                NewsEmptyState()
+            }
+            else -> {
+                NewsTicker(news = news)
+            }
+        }
+    }
+}
+
+@Composable
+private fun NewsLoadingState() {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(120.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    strokeWidth = 2.dp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Loading news...",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NewsErrorState(
+    message: String,
+    onRetry: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.1f)
+        ),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "⚠️ Failed to Load News",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.error,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = onRetry,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                ),
+                modifier = Modifier.height(32.dp)
+            ) {
+                Text(
+                    text = "Retry",
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NewsEmptyState() {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(120.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "📰",
+                style = MaterialTheme.typography.headlineMedium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "No news available",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "Please check back later",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun NewsTicker(news: List<Article>) {
     val scrollState = rememberScrollState()
     val uriHandler = LocalUriHandler.current
 
@@ -181,191 +367,28 @@ private fun NewsTicker(news: List<Article>, onViewAllNewsClick: () -> Unit) {
         }
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 16.dp)
+            .horizontalScroll(scrollState, enabled = true)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = "Latest News",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f)
-            )
-            TextButton(
-                onClick = onViewAllNewsClick
-            ) {
-                Text(
-                    text = "View All",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Medium
+            // Duplicate the list to ensure continuous scrolling
+            val newsToDisplay = news + news + news
+            newsToDisplay.forEach { article ->
+                NewsTickerCard(
+                    article = article,
+                    onClick = { uriHandler.openUri(article.url) }
                 )
-            }
-        }
-        Spacer(modifier = Modifier.height(12.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(scrollState, enabled = true)
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Duplicate the list to ensure continuous scrolling
-                val newsToDisplay = news + news + news
-                newsToDisplay.forEach { article ->
-                    NewsTickerCard(
-                        article = article,
-                        onClick = { uriHandler.openUri(article.url) }
-                    )
-                }
             }
         }
     }
 }
 
-@Composable
-private fun IBMDemoSection(
-    onStockClick: (String) -> Unit
-) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = "Featured",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Text(
-                        text = "Featured Demo Stock",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                Text(
-                    text = "IBM - Full details available for testing",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Card(
-            onClick = { onStockClick("IBM") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
-            ),
-            elevation = CardDefaults.cardElevation(
-                defaultElevation = 4.dp,
-                pressedElevation = 8.dp
-            ),
-            shape = MaterialTheme.shapes.medium
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    // IBM Logo Circle
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "IBM",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-
-                    Column {
-                        Text(
-                            text = "International Business Machines",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "IBM • Technology",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = "Tap to view full company details",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-
-                Column(
-                    horizontalAlignment = Alignment.End
-                ) {
-                    Text(
-                        text = "$185.92",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "+1.23 (0.67%)",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = PositiveGreen,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Demo info card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            ),
-            shape = MaterialTheme.shapes.small
-        ) {
-            Text(
-                text = "💡 Demo Mode: IBM stock uses demo API key with full company overview data available",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(12.dp)
-            )
-        }
-    }
-}
+// Keep all other existing composables unchanged...
+// (GrowwTopAppBar, WelcomeSection, VerticalStockSection, HorizontalStockSection, etc.)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -530,7 +553,7 @@ private fun VerticalStockSection(
             ) {
                 items(stocks, key = { it.ticker }) { stock ->
                     AnimatedVisibility(
-                        visible = true, // The parent LazyGrid manages visibility
+                        visible = true,
                         enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
                         exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 })
                     ) {
@@ -579,7 +602,7 @@ private fun HorizontalStockSection(
             ) {
                 items(stocks, key = { it.ticker }) { stock ->
                     AnimatedVisibility(
-                        visible = true, // The parent LazyRow manages visibility
+                        visible = true,
                         enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
                         exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 })
                     ) {
@@ -591,6 +614,142 @@ private fun HorizontalStockSection(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun IBMDemoSection(
+    onStockClick: (String) -> Unit
+) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = "Featured",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "Featured Demo Stock",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Text(
+                    text = "IBM - Full details available for testing",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Card(
+            onClick = { onStockClick("IBM") },
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
+            ),
+            elevation = CardDefaults.cardElevation(
+                defaultElevation = 4.dp,
+                pressedElevation = 8.dp
+            ),
+            shape = MaterialTheme.shapes.medium
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // IBM Logo Circle
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "IBM",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+
+                    Column {
+                        Text(
+                            text = "International Business Machines",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "IBM • Technology",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "Tap to view full company details",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                Column(
+                    horizontalAlignment = Alignment.End
+                ) {
+                    Text(
+                        text = "$185.92",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "+1.23 (0.67%)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = PositiveGreen,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Demo info card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            ),
+            shape = MaterialTheme.shapes.small
+        ) {
+            Text(
+                text = "💡 Demo Mode: IBM stock uses demo API key with full company overview data available",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(12.dp)
+            )
         }
     }
 }
