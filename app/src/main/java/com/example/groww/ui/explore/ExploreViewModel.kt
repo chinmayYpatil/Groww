@@ -10,6 +10,7 @@ import com.example.groww.domain.usecase.GetTopGainersUseCase
 import com.example.groww.domain.usecase.GetTopLosersUseCase
 import com.example.groww.domain.usecase.GetNewsSentimentUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -32,7 +33,7 @@ class ExploreViewModel @Inject constructor(
     private val _newsFeed = MutableLiveData<List<Article>>()
     val newsFeed: LiveData<List<Article>> = _newsFeed
 
-    // Separate loading states
+    // Separate loading states for better UX
     private val _isLoadingStocks = MutableLiveData<Boolean>()
     val isLoadingStocks: LiveData<Boolean> = _isLoadingStocks
 
@@ -49,76 +50,159 @@ class ExploreViewModel @Inject constructor(
     private val _newsError = MutableLiveData<String?>()
     val newsError: LiveData<String?> = _newsError
 
+    // Add job management to prevent overlapping requests
+    private var fetchStocksJob: Job? = null
+    private var fetchNewsJob: Job? = null
+
     fun fetchTopStocks(apiKey: String) {
+        // Cancel any existing jobs to prevent overlapping requests
+        fetchStocksJob?.cancel()
+        fetchNewsJob?.cancel()
+
         // Launch both operations concurrently
-        fetchStockData(apiKey)
-        fetchNewsData(apiKey)
+        fetchStocksJob = fetchStockData(apiKey)
+        fetchNewsJob = fetchNewsData(apiKey)
     }
 
-    private fun fetchStockData(apiKey: String) {
-        viewModelScope.launch {
+    private fun fetchStockData(apiKey: String): Job {
+        return viewModelScope.launch {
             try {
-                _isLoadingStocks.value = true
-                _isLoading.value = true // For backward compatibility
-                _error.value = null
+                // Only update loading state if it's actually changing
+                setLoadingStocksIfChanged(true)
+                setLoadingIfChanged(true) // For backward compatibility
+                clearErrorIfChanged()
 
                 val response = getTopGainersUseCase.getTopGainersLosersResponse(apiKey)
 
-                _topGainers.value = response.topGainers
-                _topLosers.value = response.topLosers
-                _mostActivelyTraded.value = response.mostActivelyTraded
+                // Only update values if they actually changed
+                setTopGainersIfChanged(response.topGainers)
+                setTopLosersIfChanged(response.topLosers)
+                setMostActiveIfChanged(response.mostActivelyTraded)
 
             } catch (e: Exception) {
-                _error.value = when {
+                val errorMessage = when {
                     e.message?.contains("network", ignoreCase = true) == true ->
                         "Network error. Please check your connection."
                     e.message?.contains("api", ignoreCase = true) == true ->
                         "API limit reached. Please try again later."
                     else -> "Something went wrong. Please try again."
                 }
-                _topGainers.value = emptyList()
-                _topLosers.value = emptyList()
-                _mostActivelyTraded.value = emptyList()
+
+                setErrorIfChanged(errorMessage)
+                setTopGainersIfChanged(emptyList())
+                setTopLosersIfChanged(emptyList())
+                setMostActiveIfChanged(emptyList())
             } finally {
-                _isLoadingStocks.value = false
-                _isLoading.value = false // For backward compatibility
+                setLoadingStocksIfChanged(false)
+                setLoadingIfChanged(false) // For backward compatibility
             }
         }
     }
 
-    private fun fetchNewsData(apiKey: String) {
-        viewModelScope.launch {
+    private fun fetchNewsData(apiKey: String): Job {
+        return viewModelScope.launch {
             try {
-                _isLoadingNews.value = true
-                _newsError.value = null
+                setLoadingNewsIfChanged(true)
+                clearNewsErrorIfChanged()
 
                 // Fetch news data separately
                 val newsResponse = getNewsSentimentUseCase.execute("AAPL", "demo")
-                _newsFeed.value = newsResponse.feed
+                setNewsFeedIfChanged(newsResponse.feed)
 
             } catch (e: Exception) {
-                _newsError.value = when {
+                val newsErrorMessage = when {
                     e.message?.contains("network", ignoreCase = true) == true ->
                         "Failed to load news. Check your connection."
                     e.message?.contains("api", ignoreCase = true) == true ->
                         "News API limit reached. Please try again later."
                     else -> "Failed to load news. Please try again."
                 }
-                _newsFeed.value = emptyList()
+
+                setNewsErrorIfChanged(newsErrorMessage)
+                setNewsFeedIfChanged(emptyList())
             } finally {
-                _isLoadingNews.value = false
+                setLoadingNewsIfChanged(false)
             }
+        }
+    }
+
+    // Optimized setter methods to prevent unnecessary LiveData emissions
+    private fun setLoadingStocksIfChanged(isLoading: Boolean) {
+        if (_isLoadingStocks.value != isLoading) {
+            _isLoadingStocks.value = isLoading
+        }
+    }
+
+    private fun setLoadingIfChanged(isLoading: Boolean) {
+        if (_isLoading.value != isLoading) {
+            _isLoading.value = isLoading
+        }
+    }
+
+    private fun setLoadingNewsIfChanged(isLoading: Boolean) {
+        if (_isLoadingNews.value != isLoading) {
+            _isLoadingNews.value = isLoading
+        }
+    }
+
+    private fun setTopGainersIfChanged(stocks: List<StockInfo>) {
+        if (_topGainers.value != stocks) {
+            _topGainers.value = stocks
+        }
+    }
+
+    private fun setTopLosersIfChanged(stocks: List<StockInfo>) {
+        if (_topLosers.value != stocks) {
+            _topLosers.value = stocks
+        }
+    }
+
+    private fun setMostActiveIfChanged(stocks: List<StockInfo>) {
+        if (_mostActivelyTraded.value != stocks) {
+            _mostActivelyTraded.value = stocks
+        }
+    }
+
+    private fun setNewsFeedIfChanged(articles: List<Article>) {
+        if (_newsFeed.value != articles) {
+            _newsFeed.value = articles
+        }
+    }
+
+    private fun setErrorIfChanged(error: String?) {
+        if (_error.value != error) {
+            _error.value = error
+        }
+    }
+
+    private fun setNewsErrorIfChanged(error: String?) {
+        if (_newsError.value != error) {
+            _newsError.value = error
+        }
+    }
+
+    private fun clearErrorIfChanged() {
+        if (_error.value != null) {
+            _error.value = null
+        }
+    }
+
+    private fun clearNewsErrorIfChanged() {
+        if (_newsError.value != null) {
+            _newsError.value = null
         }
     }
 
     // Method to retry only stock data
     fun retryStockData(apiKey: String) {
-        fetchStockData(apiKey)
+        fetchStocksJob?.cancel()
+        fetchStocksJob = fetchStockData(apiKey)
     }
 
     // Method to retry only news data
     fun retryNewsData(apiKey: String) {
-        fetchNewsData(apiKey)
+        fetchNewsJob?.cancel()
+        fetchNewsJob = fetchNewsData(apiKey)
     }
 
     fun clearError() {
@@ -127,5 +211,12 @@ class ExploreViewModel @Inject constructor(
 
     fun clearNewsError() {
         _newsError.value = null
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        // Clean up jobs when ViewModel is destroyed
+        fetchStocksJob?.cancel()
+        fetchNewsJob?.cancel()
     }
 }

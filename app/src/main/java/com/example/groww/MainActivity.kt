@@ -1,8 +1,12 @@
 package com.example.groww
 
+import android.content.ComponentCallbacks2
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
@@ -33,8 +37,22 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
+        )
+
         setContent {
             GrowwApp()
+        }
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        // Clear resources when memory is low
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE) {
+            System.gc()
         }
     }
 }
@@ -66,6 +84,7 @@ fun GrowwApp() {
     }
 }
 
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun OptimizedAppNavHost(
     navController: NavHostController,
@@ -76,13 +95,104 @@ fun OptimizedAppNavHost(
     NavHost(
         navController = navController,
         startDestination = "explore_route",
-        modifier = modifier
+        modifier = modifier,
+        // Optimized navigation transitions
+        enterTransition = {
+            when (targetState.destination.route) {
+                "stock_details/{symbol}", "search_route", "view_all/{type}", "view_all_news" -> {
+                    // Forward navigation - slide in from right with fade
+                    slideInHorizontally(
+                        initialOffsetX = { fullWidth -> fullWidth / 3 },
+                        animationSpec = tween(300, easing = FastOutSlowInEasing)
+                    ) + fadeIn(
+                        animationSpec = tween(300, easing = FastOutSlowInEasing)
+                    )
+                }
+                "watchlist_detail/{watchlistId}/{watchlistName}" -> {
+                    // Watchlist detail - slide up from bottom
+                    slideInVertically(
+                        initialOffsetY = { fullHeight -> fullHeight / 4 },
+                        animationSpec = tween(350, easing = FastOutSlowInEasing)
+                    ) + fadeIn(
+                        animationSpec = tween(250, easing = FastOutSlowInEasing)
+                    )
+                }
+                else -> {
+                    // Tab navigation - just fade
+                    fadeIn(
+                        animationSpec = tween(200, easing = LinearEasing)
+                    )
+                }
+            }
+        },
+        exitTransition = {
+            when (targetState.destination.route) {
+                "stock_details/{symbol}", "search_route", "view_all/{type}", "view_all_news" -> {
+                    // Stay put when navigating forward
+                    fadeOut(
+                        animationSpec = tween(150, easing = FastOutLinearInEasing)
+                    )
+                }
+                else -> {
+                    // Tab navigation
+                    fadeOut(
+                        animationSpec = tween(150, easing = LinearEasing)
+                    )
+                }
+            }
+        },
+        popEnterTransition = {
+            when (initialState.destination.route) {
+                "stock_details/{symbol}", "search_route", "view_all/{type}", "view_all_news" -> {
+                    // Coming back to main screens - fade in quickly
+                    fadeIn(
+                        animationSpec = tween(200, easing = FastOutSlowInEasing)
+                    )
+                }
+                "watchlist_detail/{watchlistId}/{watchlistName}" -> {
+                    // Coming back from watchlist detail
+                    slideInVertically(
+                        initialOffsetY = { fullHeight -> -fullHeight / 6 },
+                        animationSpec = tween(250, easing = FastOutSlowInEasing)
+                    ) + fadeIn(
+                        animationSpec = tween(200, easing = FastOutSlowInEasing)
+                    )
+                }
+                else -> {
+                    fadeIn(animationSpec = tween(150, easing = LinearEasing))
+                }
+            }
+        },
+        popExitTransition = {
+            when (initialState.destination.route) {
+                "stock_details/{symbol}", "search_route", "view_all/{type}", "view_all_news" -> {
+                    // Slide out to right when going back
+                    slideOutHorizontally(
+                        targetOffsetX = { fullWidth -> fullWidth / 2 },
+                        animationSpec = tween(250, easing = FastOutSlowInEasing)
+                    ) + fadeOut(
+                        animationSpec = tween(200, easing = FastOutLinearInEasing)
+                    )
+                }
+                "watchlist_detail/{watchlistId}/{watchlistName}" -> {
+                    // Slide down when going back from watchlist detail
+                    slideOutVertically(
+                        targetOffsetY = { fullHeight -> fullHeight / 3 },
+                        animationSpec = tween(250, easing = FastOutSlowInEasing)
+                    ) + fadeOut(
+                        animationSpec = tween(200, easing = FastOutLinearInEasing)
+                    )
+                }
+                else -> {
+                    fadeOut(animationSpec = tween(150, easing = LinearEasing))
+                }
+            }
+        }
     ) {
         composable("explore_route") {
             ExploreScreen(
                 onStockClick = { symbol ->
                     navController.navigate("stock_details/$symbol") {
-                        // Optimize navigation animations
                         launchSingleTop = true
                     }
                 },
@@ -150,18 +260,31 @@ fun OptimizedAppNavHost(
             )
         }
 
-        // Stock Details Screen
+        // Stock Details Screen - Optimized
         composable("stock_details/{symbol}") { backStackEntry ->
             val symbol = remember {
                 backStackEntry.arguments?.getString("symbol") ?: ""
             }
 
-            StockDetailsScreen(
-                symbol = symbol,
-                onBackClick = {
-                    navController.popBackStack()
-                }
-            )
+            // Wrap in AnimatedContent for smooth internal transitions
+            AnimatedContent(
+                targetState = symbol,
+                transitionSpec = {
+                    fadeIn(
+                        animationSpec = tween(200, easing = FastOutSlowInEasing)
+                    ) with fadeOut(
+                        animationSpec = tween(150, easing = FastOutLinearInEasing)
+                    )
+                },
+                label = "stock_details_content"
+            ) { currentSymbol ->
+                StockDetailsScreen(
+                    symbol = currentSymbol,
+                    onBackClick = {
+                        navController.popBackStack()
+                    }
+                )
+            }
         }
 
         composable("search_route") {
@@ -206,7 +329,6 @@ fun OptimizedAppNavHost(
         composable("create_watchlist") {
             // TODO: Implement CreateWatchlistScreen
             // For now, just pop back
-            // In a real implementation, this would be a screen to create a new watchlist
         }
     }
 }

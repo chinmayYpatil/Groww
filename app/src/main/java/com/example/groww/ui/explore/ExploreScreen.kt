@@ -1,14 +1,9 @@
 package com.example.groww.ui.explore
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -43,11 +38,6 @@ import com.example.groww.ui.common.StockCard
 import com.example.groww.ui.theme.*
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.animation.core.InfiniteTransition
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.ui.text.style.TextOverflow
 import coil3.compose.AsyncImage
 import com.example.groww.ui.news.NewsTickerCard
@@ -63,6 +53,7 @@ fun ExploreScreen(
     darkTheme: Boolean,
     onThemeToggle: () -> Unit
 ) {
+    // Cache state observations to reduce recompositions
     val topGainers by viewModel.topGainers.observeAsState(initial = emptyList())
     val topLosers by viewModel.topLosers.observeAsState(initial = emptyList())
     val mostActivelyTraded by viewModel.mostActivelyTraded.observeAsState(initial = emptyList())
@@ -74,6 +65,10 @@ fun ExploreScreen(
 
     val error by viewModel.error.observeAsState()
     val newsError by viewModel.newsError.observeAsState()
+
+    // Memoize expensive operations
+    val topGainersForDisplay = remember(topGainers) { topGainers.take(4) }
+    val topLosersForDisplay = remember(topLosers) { topLosers.take(4) }
 
     // Cache scroll state to prevent recreation
     val scrollState = rememberScrollState()
@@ -87,12 +82,14 @@ fun ExploreScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Custom Top App Bar with Gradient - Optimized
-        OptimizedGrowwTopAppBar(
-            onSearchClick = onSearchClick,
-            darkTheme = darkTheme,
-            onThemeToggle = onThemeToggle
-        )
+        // Custom Top App Bar with Gradient - Optimized with key
+        key(darkTheme) {
+            OptimizedGrowwTopAppBar(
+                onSearchClick = onSearchClick,
+                darkTheme = darkTheme,
+                onThemeToggle = onThemeToggle
+            )
+        }
 
         // Main Content - Use cached scroll state
         Column(
@@ -103,8 +100,10 @@ fun ExploreScreen(
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Welcome Section - Memoized
-            MemoizedWelcomeSection()
+            // Welcome Section - Memoized with key
+            key("welcome") {
+                MemoizedWelcomeSection()
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -117,56 +116,66 @@ fun ExploreScreen(
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
-            // Top Gainers Section - Optimized
-            OptimizedVerticalStockSection(
-                title = "Top Gainers",
-                subtitle = "Stocks with highest gains today",
-                stocks = topGainers.take(4),
-                isLoading = isLoadingStocks,
-                onStockClick = onStockClick,
-                onViewAllClick = { onViewAllClick("gainers") }
-            )
+            // Top Gainers Section - Optimized with key
+            key("top_gainers", topGainersForDisplay.size, isLoadingStocks) {
+                OptimizedVerticalStockSection(
+                    title = "Top Gainers",
+                    subtitle = "Stocks with highest gains today",
+                    stocks = topGainersForDisplay,
+                    isLoading = isLoadingStocks,
+                    onStockClick = onStockClick,
+                    onViewAllClick = { onViewAllClick("gainers") }
+                )
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Top Losers Section - Optimized
-            OptimizedVerticalStockSection(
-                title = "Top Losers",
-                subtitle = "Stocks with highest losses today",
-                stocks = topLosers.take(4),
-                isLoading = isLoadingStocks,
-                onStockClick = onStockClick,
-                onViewAllClick = { onViewAllClick("losers") }
-            )
+            // Top Losers Section - Optimized with key
+            key("top_losers", topLosersForDisplay.size, isLoadingStocks) {
+                OptimizedVerticalStockSection(
+                    title = "Top Losers",
+                    subtitle = "Stocks with highest losses today",
+                    stocks = topLosersForDisplay,
+                    isLoading = isLoadingStocks,
+                    onStockClick = onStockClick,
+                    onViewAllClick = { onViewAllClick("losers") }
+                )
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Most Actively Traded Section - Optimized
-            OptimizedHorizontalStockSection(
-                title = "Most Actively Traded",
-                subtitle = "Stocks with the most volume today",
-                stocks = mostActivelyTraded,
-                isLoading = isLoadingStocks,
-                onStockClick = onStockClick
-            )
+            // Most Actively Traded Section - Optimized with key
+            key("most_active", mostActivelyTraded.size, isLoadingStocks) {
+                OptimizedHorizontalStockSection(
+                    title = "Most Actively Traded",
+                    subtitle = "Stocks with the most volume today",
+                    stocks = mostActivelyTraded,
+                    isLoading = isLoadingStocks,
+                    onStockClick = onStockClick
+                )
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // News Ticker with separate loading state - Optimized
-            OptimizedNewsSection(
-                news = newsFeed,
-                isLoadingNews = isLoadingNews,
-                newsError = newsError,
-                onViewAllNewsClick = onViewAllNewsClick,
-                onRetryNews = { viewModel.retryNewsData(BuildConfig.API_KEY) }
-            )
+            // News Ticker with separate loading state - Optimized with key
+            key("news", newsFeed.size, isLoadingNews) {
+                OptimizedNewsSection(
+                    news = newsFeed,
+                    isLoadingNews = isLoadingNews,
+                    newsError = newsError,
+                    onViewAllNewsClick = onViewAllNewsClick,
+                    onRetryNews = { viewModel.retryNewsData(BuildConfig.API_KEY) }
+                )
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Special IBM Demo Section - Memoized
-            MemoizedIBMDemoSection(
-                onStockClick = onStockClick
-            )
+            // Special IBM Demo Section - Memoized with key
+            key("ibm_demo") {
+                MemoizedIBMDemoSection(
+                    onStockClick = onStockClick
+                )
+            }
 
             // Bottom padding for better scrolling
             Spacer(modifier = Modifier.height(100.dp))
@@ -183,9 +192,9 @@ private fun OptimizedGrowwTopAppBar(
 ) {
     // Optimize animation with faster duration and better easing
     val rotation by animateFloatAsState(
-        targetValue = if (darkTheme) 180f else 0f, // Reduced rotation for smoother animation
+        targetValue = if (darkTheme) 180f else 0f,
         animationSpec = tween(
-            durationMillis = 300, // Reduced from 500ms
+            durationMillis = 300,
             easing = FastOutSlowInEasing
         ),
         label = "theme_toggle_rotation"
@@ -344,7 +353,6 @@ private fun OptimizedVerticalStockSection(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(stocks, key = { it.ticker }) { stock ->
-                    // Simplified animation for better performance
                     StockCard(
                         stock = stock,
                         onClick = onStockClick
@@ -500,7 +508,7 @@ private fun OptimizedNewsLoadingState() {
 private fun OptimizedNewsTicker(news: List<Article>) {
     val uriHandler = LocalUriHandler.current
 
-    // Simplified ticker without complex animations
+    // Simplified ticker without complex animations for better performance
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -509,9 +517,7 @@ private fun OptimizedNewsTicker(news: List<Article>) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Show only original list + one duplicate for smoother performance
-            val newsToDisplay = news + news
-            newsToDisplay.forEach { article ->
+            news.forEach { article ->
                 NewsTickerCard(
                     article = article,
                     onClick = { uriHandler.openUri(article.url) }
@@ -658,7 +664,7 @@ private fun MemoizedIBMDemoSection(
     }
 }
 
-// Helper composables remain the same but simplified...
+// Helper composables optimized for performance
 @Composable
 private fun LoadingGrid() {
     LazyVerticalGrid(

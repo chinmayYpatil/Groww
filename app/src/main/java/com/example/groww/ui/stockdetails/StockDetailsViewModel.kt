@@ -1,4 +1,3 @@
-// groww/ui/stockdetails/StockDetailsViewModel.kt
 package com.example.groww.ui.stockdetails
 
 import android.util.Log
@@ -15,6 +14,7 @@ import com.example.groww.domain.usecase.CheckStockWatchlistStatusUseCase
 import com.example.groww.domain.usecase.GetStockDetailsUseCase
 import com.example.groww.domain.usecase.RemoveStockFromWatchlistUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -50,32 +50,39 @@ class StockDetailsViewModel @Inject constructor(
 
     val symbol: String = savedStateHandle.get<String>("symbol") ?: ""
 
+    // Job management for better performance
+    private var fetchDetailsJob: Job? = null
+    private var fetchTimeSeriesJob: Job? = null
+    private var watchlistJob: Job? = null
+
     fun fetchStockDetails(apiKey: String) {
-        viewModelScope.launch {
-            _uiState.value = StockDetailsState.Loading
+        fetchDetailsJob?.cancel()
+        fetchDetailsJob = viewModelScope.launch {
+            setUiStateIfChanged(StockDetailsState.Loading)
             try {
                 val details = getStockDetailsUseCase.execute(symbol, apiKey)
                 if (details != null) {
-                    _uiState.value = StockDetailsState.FullDetails(details, null)
+                    setUiStateIfChanged(StockDetailsState.FullDetails(details, null))
                 } else {
                     val stockInfo = stockRepository.getStockInfoFromCache(symbol)
                     if (stockInfo != null) {
-                        _uiState.value = StockDetailsState.PartialDetails(stockInfo)
+                        setUiStateIfChanged(StockDetailsState.PartialDetails(stockInfo))
                     } else {
-                        _uiState.value = StockDetailsState.Empty
+                        setUiStateIfChanged(StockDetailsState.Empty)
                     }
                 }
                 checkWatchlistStatus()
             } catch (e: Exception) {
-                _uiState.value = StockDetailsState.Error("Failed to load stock details: ${e.message}")
+                setUiStateIfChanged(StockDetailsState.Error("Failed to load stock details: ${e.message}"))
                 checkWatchlistStatus()
             }
         }
     }
 
     fun fetchTimeSeriesData(timeFrame: String, apiKey: String) {
-        viewModelScope.launch {
-            _isLoadingTimeSeries.value = true
+        fetchTimeSeriesJob?.cancel()
+        fetchTimeSeriesJob = viewModelScope.launch {
+            setLoadingTimeSeriesIfChanged(true)
             try {
                 val response = when (timeFrame) {
                     "1D" -> stockRepository.getIntradayTimeSeries(symbol, apiKey)
@@ -85,29 +92,31 @@ class StockDetailsViewModel @Inject constructor(
                     "1Y" -> stockRepository.getWeeklyTimeSeries(symbol, apiKey)
                     else -> null
                 }
-                _timeSeriesData.value = when (response) {
+                val timeSeriesResponse = when (response) {
                     is com.example.groww.data.model.network.TimeSeriesResponse -> response
                     is com.example.groww.data.model.network.TimeSeriesResponseAdjusted -> response.toTimeSeriesResponse()
                     else -> null
                 }
+                setTimeSeriesDataIfChanged(timeSeriesResponse)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to fetch time series data for $timeFrame", e)
-                _timeSeriesData.value = null
+                setTimeSeriesDataIfChanged(null)
             } finally {
-                _isLoadingTimeSeries.value = false
+                setLoadingTimeSeriesIfChanged(false)
             }
         }
     }
 
     fun checkWatchlistStatus() {
-        viewModelScope.launch {
+        watchlistJob?.cancel()
+        watchlistJob = viewModelScope.launch {
             try {
                 val isInWatchlist = checkStockWatchlistStatusUseCase.execute(symbol)
-                _isStockInWatchlist.value = isInWatchlist
+                setWatchlistStatusIfChanged(isInWatchlist)
                 Log.d(TAG, "Stock $symbol watchlist status: $isInWatchlist")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to check watchlist status", e)
-                _isStockInWatchlist.value = false
+                setWatchlistStatusIfChanged(false)
             }
         }
     }
@@ -122,15 +131,17 @@ class StockDetailsViewModel @Inject constructor(
                     removeStockFromWatchlistUseCase.execute(stockEntity.watchlistId, symbol)
                     Log.d(TAG, "Removed $symbol from watchlist ${stockEntity.watchlistId}")
                 }
-                _isStockInWatchlist.value = false
-                _actionMessage.value = if (stockWatchlists.isNotEmpty()) {
-                    "Removed from ${stockWatchlists.size} watchlist${if (stockWatchlists.size > 1) "s" else ""}"
-                } else {
-                    "Stock not found in any watchlist"
-                }
+                setWatchlistStatusIfChanged(false)
+                setActionMessageIfChanged(
+                    if (stockWatchlists.isNotEmpty()) {
+                        "Removed from ${stockWatchlists.size} watchlist${if (stockWatchlists.size > 1) "s" else ""}"
+                    } else {
+                        "Stock not found in any watchlist"
+                    }
+                )
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to remove from watchlists", e)
-                _actionMessage.value = "Failed to remove from watchlist"
+                setActionMessageIfChanged("Failed to remove from watchlist")
             }
         }
     }
@@ -141,5 +152,44 @@ class StockDetailsViewModel @Inject constructor(
 
     fun clearActionMessage() {
         _actionMessage.value = null
+    }
+
+    // Optimized setter methods to prevent unnecessary LiveData emissions
+    private fun setUiStateIfChanged(newState: StockDetailsState) {
+        if (_uiState.value != newState) {
+            _uiState.value = newState
+        }
+    }
+
+    private fun setWatchlistStatusIfChanged(isInWatchlist: Boolean) {
+        if (_isStockInWatchlist.value != isInWatchlist) {
+            _isStockInWatchlist.value = isInWatchlist
+        }
+    }
+
+    private fun setActionMessageIfChanged(message: String?) {
+        if (_actionMessage.value != message) {
+            _actionMessage.value = message
+        }
+    }
+
+    private fun setTimeSeriesDataIfChanged(data: TimeSeriesResponse?) {
+        if (_timeSeriesData.value != data) {
+            _timeSeriesData.value = data
+        }
+    }
+
+    private fun setLoadingTimeSeriesIfChanged(isLoading: Boolean) {
+        if (_isLoadingTimeSeries.value != isLoading) {
+            _isLoadingTimeSeries.value = isLoading
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        // Clean up jobs when ViewModel is destroyed
+        fetchDetailsJob?.cancel()
+        fetchTimeSeriesJob?.cancel()
+        watchlistJob?.cancel()
     }
 }

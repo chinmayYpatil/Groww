@@ -2,6 +2,7 @@ package com.example.groww.ui.theme
 
 import android.app.Activity
 import android.os.Build
+import android.view.WindowManager
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -121,6 +122,12 @@ fun GrowwTheme(
             if (window.statusBarColor != statusBarColor) {
                 window.statusBarColor = statusBarColor
                 WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+
+                // Add performance optimizations
+                window.setFlags(
+                    WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                    WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
+                )
             }
         }
     }
