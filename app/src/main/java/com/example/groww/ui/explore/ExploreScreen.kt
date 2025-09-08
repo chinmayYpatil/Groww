@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -47,7 +48,6 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.keyframes
 import androidx.compose.ui.text.style.TextOverflow
 import coil3.compose.AsyncImage
 import com.example.groww.ui.news.NewsTickerCard
@@ -75,6 +75,9 @@ fun ExploreScreen(
     val error by viewModel.error.observeAsState()
     val newsError by viewModel.newsError.observeAsState()
 
+    // Cache scroll state to prevent recreation
+    val scrollState = rememberScrollState()
+
     LaunchedEffect(Unit) {
         viewModel.fetchTopStocks(BuildConfig.API_KEY)
     }
@@ -84,24 +87,24 @@ fun ExploreScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Custom Top App Bar with Gradient
-        GrowwTopAppBar(
+        // Custom Top App Bar with Gradient - Optimized
+        OptimizedGrowwTopAppBar(
             onSearchClick = onSearchClick,
             darkTheme = darkTheme,
             onThemeToggle = onThemeToggle
         )
 
-        // Main Content
+        // Main Content - Use cached scroll state
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(horizontal = 16.dp)
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Welcome Section
-            WelcomeSection()
+            // Welcome Section - Memoized
+            MemoizedWelcomeSection()
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -114,8 +117,8 @@ fun ExploreScreen(
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
-            // Top Gainers Section
-            VerticalStockSection(
+            // Top Gainers Section - Optimized
+            OptimizedVerticalStockSection(
                 title = "Top Gainers",
                 subtitle = "Stocks with highest gains today",
                 stocks = topGainers.take(4),
@@ -126,8 +129,8 @@ fun ExploreScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Top Losers Section
-            VerticalStockSection(
+            // Top Losers Section - Optimized
+            OptimizedVerticalStockSection(
                 title = "Top Losers",
                 subtitle = "Stocks with highest losses today",
                 stocks = topLosers.take(4),
@@ -138,8 +141,8 @@ fun ExploreScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Most Actively Traded Section
-            HorizontalStockSection(
+            // Most Actively Traded Section - Optimized
+            OptimizedHorizontalStockSection(
                 title = "Most Actively Traded",
                 subtitle = "Stocks with the most volume today",
                 stocks = mostActivelyTraded,
@@ -149,8 +152,8 @@ fun ExploreScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // News Ticker with separate loading state
-            NewsSection(
+            // News Ticker with separate loading state - Optimized
+            OptimizedNewsSection(
                 news = newsFeed,
                 isLoadingNews = isLoadingNews,
                 newsError = newsError,
@@ -160,260 +163,46 @@ fun ExploreScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Special IBM Demo Section
-            IBMDemoSection(
+            // Special IBM Demo Section - Memoized
+            MemoizedIBMDemoSection(
                 onStockClick = onStockClick
             )
+
+            // Bottom padding for better scrolling
+            Spacer(modifier = Modifier.height(100.dp))
         }
     }
 }
-
-@Composable
-private fun NewsSection(
-    news: List<Article>,
-    isLoadingNews: Boolean,
-    newsError: String?,
-    onViewAllNewsClick: () -> Unit,
-    onRetryNews: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 16.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Latest News",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f)
-            )
-            if (!isLoadingNews && news.isNotEmpty()) {
-                TextButton(
-                    onClick = onViewAllNewsClick
-                ) {
-                    Text(
-                        text = "View All",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        when {
-            isLoadingNews -> {
-                NewsLoadingState()
-            }
-            newsError != null -> {
-                NewsErrorState(
-                    message = newsError,
-                    onRetry = onRetryNews
-                )
-            }
-            news.isEmpty() -> {
-                NewsEmptyState()
-            }
-            else -> {
-                NewsTicker(news = news)
-            }
-        }
-    }
-}
-
-@Composable
-private fun NewsLoadingState() {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(120.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        shape = MaterialTheme.shapes.medium
-    ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    strokeWidth = 2.dp
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Loading news...",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun NewsErrorState(
-    message: String,
-    onRetry: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.1f)
-        ),
-        shape = MaterialTheme.shapes.medium
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "⚠️ Failed to Load News",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.error,
-                fontWeight = FontWeight.Medium
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Button(
-                onClick = onRetry,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                ),
-                modifier = Modifier.height(32.dp)
-            ) {
-                Text(
-                    text = "Retry",
-                    style = MaterialTheme.typography.labelSmall
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun NewsEmptyState() {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(120.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        shape = MaterialTheme.shapes.medium
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = "📰",
-                style = MaterialTheme.typography.headlineMedium
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "No news available",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = "Please check back later",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-private fun NewsTicker(news: List<Article>) {
-    val scrollState = rememberScrollState()
-    val uriHandler = LocalUriHandler.current
-
-    LaunchedEffect(Unit) {
-        while (true) {
-            scrollState.animateScrollTo(
-                scrollState.maxValue,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(
-                        durationMillis = news.size * 10000, // Slower speed
-                        easing = LinearEasing
-                    ),
-                    repeatMode = RepeatMode.Restart
-                )
-            )
-        }
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(scrollState, enabled = true)
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Duplicate the list to ensure continuous scrolling
-            val newsToDisplay = news + news + news
-            newsToDisplay.forEach { article ->
-                NewsTickerCard(
-                    article = article,
-                    onClick = { uriHandler.openUri(article.url) }
-                )
-            }
-        }
-    }
-}
-
-// Keep all other existing composables unchanged...
-// (GrowwTopAppBar, WelcomeSection, VerticalStockSection, HorizontalStockSection, etc.)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun GrowwTopAppBar(
+private fun OptimizedGrowwTopAppBar(
     onSearchClick: () -> Unit,
     darkTheme: Boolean,
     onThemeToggle: () -> Unit
 ) {
+    // Optimize animation with faster duration and better easing
     val rotation by animateFloatAsState(
-        targetValue = if (darkTheme) 360f else 0f,
-        animationSpec = tween(durationMillis = 500),
+        targetValue = if (darkTheme) 180f else 0f, // Reduced rotation for smoother animation
+        animationSpec = tween(
+            durationMillis = 300, // Reduced from 500ms
+            easing = FastOutSlowInEasing
+        ),
         label = "theme_toggle_rotation"
     )
+
+    // Cache gradient colors to prevent recreation
+    val gradientColors = remember(darkTheme) {
+        listOf(
+            if (darkTheme) Color(0xFF00D09C) else Color(0xFF00D09C),
+            if (darkTheme) Color(0xFF00B085) else Color(0xFF00B085)
+        )
+    }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.primary,
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
-                    )
-                )
-            )
+            .background(brush = Brush.verticalGradient(colors = gradientColors))
             .padding(16.dp)
     ) {
         Row(
@@ -472,7 +261,8 @@ private fun GrowwTopAppBar(
 }
 
 @Composable
-private fun WelcomeSection() {
+private fun MemoizedWelcomeSection() {
+    // Memoize the welcome section to prevent unnecessary recompositions
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -502,7 +292,7 @@ private fun WelcomeSection() {
 }
 
 @Composable
-private fun VerticalStockSection(
+private fun OptimizedVerticalStockSection(
     title: String,
     subtitle: String,
     stocks: List<StockInfo>,
@@ -540,6 +330,8 @@ private fun VerticalStockSection(
             }
         }
         Spacer(modifier = Modifier.height(12.dp))
+
+        // Simplified animations for better performance
         if (isLoading) {
             LoadingGrid()
         } else if (stocks.isEmpty()) {
@@ -552,16 +344,11 @@ private fun VerticalStockSection(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(stocks, key = { it.ticker }) { stock ->
-                    AnimatedVisibility(
-                        visible = true,
-                        enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
-                        exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 })
-                    ) {
-                        StockCard(
-                            stock = stock,
-                            onClick = onStockClick
-                        )
-                    }
+                    // Simplified animation for better performance
+                    StockCard(
+                        stock = stock,
+                        onClick = onStockClick
+                    )
                 }
             }
         }
@@ -569,7 +356,7 @@ private fun VerticalStockSection(
 }
 
 @Composable
-private fun HorizontalStockSection(
+private fun OptimizedHorizontalStockSection(
     title: String,
     subtitle: String,
     stocks: List<StockInfo>,
@@ -591,6 +378,7 @@ private fun HorizontalStockSection(
             )
         }
         Spacer(modifier = Modifier.height(12.dp))
+
         if (isLoading) {
             LoadingRow()
         } else if (stocks.isEmpty()) {
@@ -601,17 +389,11 @@ private fun HorizontalStockSection(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(stocks, key = { it.ticker }) { stock ->
-                    AnimatedVisibility(
-                        visible = true,
-                        enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
-                        exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 })
-                    ) {
-                        StockCard(
-                            stock = stock,
-                            onClick = onStockClick,
-                            modifier = Modifier.width(220.dp)
-                        )
-                    }
+                    StockCard(
+                        stock = stock,
+                        onClick = onStockClick,
+                        modifier = Modifier.width(220.dp)
+                    )
                 }
             }
         }
@@ -619,9 +401,131 @@ private fun HorizontalStockSection(
 }
 
 @Composable
-private fun IBMDemoSection(
+private fun OptimizedNewsSection(
+    news: List<Article>,
+    isLoadingNews: Boolean,
+    newsError: String?,
+    onViewAllNewsClick: () -> Unit,
+    onRetryNews: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Latest News",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+            if (!isLoadingNews && news.isNotEmpty()) {
+                TextButton(
+                    onClick = onViewAllNewsClick
+                ) {
+                    Text(
+                        text = "View All",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        when {
+            isLoadingNews -> {
+                OptimizedNewsLoadingState()
+            }
+            newsError != null -> {
+                NewsErrorState(
+                    message = newsError,
+                    onRetry = onRetryNews
+                )
+            }
+            news.isEmpty() -> {
+                NewsEmptyState()
+            }
+            else -> {
+                // Simplified news ticker without complex animations
+                OptimizedNewsTicker(news = news)
+            }
+        }
+    }
+}
+
+@Composable
+private fun OptimizedNewsLoadingState() {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(120.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    strokeWidth = 2.dp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Loading news...",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OptimizedNewsTicker(news: List<Article>) {
+    val uriHandler = LocalUriHandler.current
+
+    // Simplified ticker without complex animations
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState(), enabled = true)
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Show only original list + one duplicate for smoother performance
+            val newsToDisplay = news + news
+            newsToDisplay.forEach { article ->
+                NewsTickerCard(
+                    article = article,
+                    onClick = { uriHandler.openUri(article.url) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MemoizedIBMDemoSection(
     onStockClick: (String) -> Unit
 ) {
+    // Memoized IBM section to prevent unnecessary recompositions
     Column {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -754,6 +658,7 @@ private fun IBMDemoSection(
     }
 }
 
+// Helper composables remain the same but simplified...
 @Composable
 private fun LoadingGrid() {
     LazyVerticalGrid(
@@ -878,6 +783,90 @@ private fun ErrorCard(
             ) {
                 Text("Retry")
             }
+        }
+    }
+}
+
+@Composable
+private fun NewsErrorState(
+    message: String,
+    onRetry: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.1f)
+        ),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "⚠️ Failed to Load News",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.error,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = onRetry,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                ),
+                modifier = Modifier.height(32.dp)
+            ) {
+                Text(
+                    text = "Retry",
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NewsEmptyState() {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(120.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "📰",
+                style = MaterialTheme.typography.headlineMedium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "No news available",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "Please check back later",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

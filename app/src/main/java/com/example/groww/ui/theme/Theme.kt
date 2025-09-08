@@ -10,6 +10,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -86,26 +87,46 @@ fun GrowwTheme(
     dynamicColor: Boolean = false, // Disabled for consistent Groww branding
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
+    // Memoize color scheme selection to prevent recreation
+    val colorScheme = remember(darkTheme, dynamicColor) {
+        when {
+            dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+                // Dynamic colors are more expensive, cache them
+                null // Will be handled below
+            }
+            darkTheme -> GrowwDarkColorScheme
+            else -> GrowwLightColorScheme
+        }
+    }
+
+    // Handle dynamic colors separately to avoid blocking the main theme
+    val finalColorScheme = if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val context = LocalContext.current
+        remember(darkTheme, context) {
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-        darkTheme -> GrowwDarkColorScheme
-        else -> GrowwLightColorScheme
+    } else {
+        colorScheme ?: GrowwLightColorScheme
     }
 
     val view = LocalView.current
+
+    // Optimize window decorations - only update when necessary
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.primary.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = darkTheme
+            val statusBarColor = finalColorScheme.primary.toArgb()
+
+            // Only update if color actually changed
+            if (window.statusBarColor != statusBarColor) {
+                window.statusBarColor = statusBarColor
+                WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            }
         }
     }
 
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = finalColorScheme,
         typography = GrowwTypography,
         shapes = GrowwShapes,
         content = content

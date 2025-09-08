@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -54,7 +55,7 @@ fun GrowwApp() {
                     GrowwBottomNavigation(navController = navController)
                 }
             ) { innerPadding ->
-                AppNavHost(
+                OptimizedAppNavHost(
                     navController = navController,
                     modifier = Modifier.padding(innerPadding),
                     darkTheme = darkTheme,
@@ -66,7 +67,7 @@ fun GrowwApp() {
 }
 
 @Composable
-fun AppNavHost(
+fun OptimizedAppNavHost(
     navController: NavHostController,
     modifier: Modifier = Modifier,
     darkTheme: Boolean,
@@ -80,17 +81,25 @@ fun AppNavHost(
         composable("explore_route") {
             ExploreScreen(
                 onStockClick = { symbol ->
-                    navController.navigate("stock_details/$symbol")
+                    navController.navigate("stock_details/$symbol") {
+                        // Optimize navigation animations
+                        launchSingleTop = true
+                    }
                 },
                 onSearchClick = {
-                    // Navigate to search screen
-                    navController.navigate("search_route")
+                    navController.navigate("search_route") {
+                        launchSingleTop = true
+                    }
                 },
                 onViewAllClick = { type ->
-                    navController.navigate("view_all/$type")
+                    navController.navigate("view_all/$type") {
+                        launchSingleTop = true
+                    }
                 },
                 onViewAllNewsClick = {
-                    navController.navigate("view_all_news")
+                    navController.navigate("view_all_news") {
+                        launchSingleTop = true
+                    }
                 },
                 darkTheme = darkTheme,
                 onThemeToggle = onThemeToggle
@@ -100,17 +109,19 @@ fun AppNavHost(
         composable("watchlist_route") {
             WatchlistScreen(
                 onWatchlistClick = { watchlistId, watchlistName ->
-                    // Navigate to watchlist detail screen
-                    navController.navigate("watchlist_detail/$watchlistId/$watchlistName")
+                    navController.navigate("watchlist_detail/$watchlistId/$watchlistName") {
+                        launchSingleTop = true
+                    }
                 },
                 onCreateWatchlist = {
-                    // TODO: Navigate to create watchlist screen
-                    navController.navigate("create_watchlist")
+                    navController.navigate("create_watchlist") {
+                        launchSingleTop = true
+                    }
                 },
                 onExploreStocks = {
-                    // Navigate to explore tab when user wants to find stocks
                     navController.navigate("explore_route") {
                         popUpTo("watchlist_route") { inclusive = false }
+                        launchSingleTop = true
                     }
                 }
             )
@@ -118,24 +129,38 @@ fun AppNavHost(
 
         // Watchlist Detail Screen
         composable("watchlist_detail/{watchlistId}/{watchlistName}") { backStackEntry ->
-            val watchlistId = backStackEntry.arguments?.getString("watchlistId")?.toLongOrNull() ?: 0L
-            val watchlistName = backStackEntry.arguments?.getString("watchlistName") ?: ""
+            val watchlistId = remember {
+                backStackEntry.arguments?.getString("watchlistId")?.toLongOrNull() ?: 0L
+            }
+            val watchlistName = remember {
+                backStackEntry.arguments?.getString("watchlistName") ?: ""
+            }
+
             WatchlistDetailScreen(
                 watchlistId = watchlistId,
                 watchlistName = watchlistName,
-                onBackClick = { navController.popBackStack() },
+                onBackClick = {
+                    navController.popBackStack()
+                },
                 onStockClick = { symbol ->
-                    navController.navigate("stock_details/$symbol")
+                    navController.navigate("stock_details/$symbol") {
+                        launchSingleTop = true
+                    }
                 }
             )
         }
 
         // Stock Details Screen
         composable("stock_details/{symbol}") { backStackEntry ->
-            val symbol = backStackEntry.arguments?.getString("symbol") ?: ""
+            val symbol = remember {
+                backStackEntry.arguments?.getString("symbol") ?: ""
+            }
+
             StockDetailsScreen(
                 symbol = symbol,
-                onBackClick = { navController.popBackStack() }
+                onBackClick = {
+                    navController.popBackStack()
+                }
             )
         }
 
@@ -145,25 +170,36 @@ fun AppNavHost(
                     navController.popBackStack()
                 },
                 onStockClick = { symbol ->
-                    navController.navigate("stock_details/$symbol")
+                    navController.navigate("stock_details/$symbol") {
+                        launchSingleTop = true
+                    }
                 }
             )
         }
 
         composable("view_all/{type}") { backStackEntry ->
-            val type = backStackEntry.arguments?.getString("type") ?: ""
+            val type = remember {
+                backStackEntry.arguments?.getString("type") ?: ""
+            }
+
             ViewAllScreen(
                 type = type,
-                onBackClick = { navController.popBackStack() },
+                onBackClick = {
+                    navController.popBackStack()
+                },
                 onStockClick = { symbol ->
-                    navController.navigate("stock_details/$symbol")
+                    navController.navigate("stock_details/$symbol") {
+                        launchSingleTop = true
+                    }
                 }
             )
         }
 
         composable("view_all_news") {
             NewsCard(
-                onBackClick = { navController.popBackStack() }
+                onBackClick = {
+                    navController.popBackStack()
+                }
             )
         }
 
