@@ -528,7 +528,7 @@ private fun VerticalStockSection(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(stocks) { stock ->
+                items(stocks, key = { it.ticker }) { stock ->
                     AnimatedVisibility(
                         visible = true, // The parent LazyGrid manages visibility
                         enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
@@ -577,7 +577,7 @@ private fun HorizontalStockSection(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(stocks) { stock ->
+                items(stocks, key = { it.ticker }) { stock ->
                     AnimatedVisibility(
                         visible = true, // The parent LazyRow manages visibility
                         enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
@@ -586,7 +586,7 @@ private fun HorizontalStockSection(
                         StockCard(
                             stock = stock,
                             onClick = onStockClick,
-                            modifier = Modifier.width(160.dp)
+                            modifier = Modifier.width(220.dp)
                         )
                     }
                 }

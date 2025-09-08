@@ -1,9 +1,10 @@
 package com.example.groww.ui.navigation
 
-
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.List
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavController
@@ -15,17 +16,17 @@ sealed class BottomNavItem(
     val selectedIcon: androidx.compose.ui.graphics.vector.ImageVector,
     val unselectedIcon: androidx.compose.ui.graphics.vector.ImageVector
 ) {
-    object Explore : BottomNavItem(
-        route = "explore_route",
+    object Stocks : BottomNavItem(
+        route = "stocks_route",
         label = "Stocks",
-        selectedIcon = Icons.Filled.Star,
-        unselectedIcon = Icons.Outlined.Star
+        selectedIcon = Icons.Filled.Home,
+        unselectedIcon = Icons.Outlined.Home
     )
 
     object Watchlist : BottomNavItem(
         route = "watchlist_route",
-        selectedIcon = Icons.Filled.Star,
-        unselectedIcon = Icons.Outlined.Star,
+        selectedIcon = Icons.Filled.List,
+        unselectedIcon = Icons.Outlined.List,
         label = "Watchlist"
     )
 }
@@ -34,7 +35,7 @@ sealed class BottomNavItem(
 fun GrowwBottomNavigation(
     navController: NavController,
     items: List<BottomNavItem> = listOf(
-        BottomNavItem.Explore,
+        BottomNavItem.Stocks,
         BottomNavItem.Watchlist
     )
 ) {

@@ -94,7 +94,7 @@ fun StockCard(
             ) {
                 Column {
                     Text(
-                        text = "₹${stock.price}",
+                        text = "$${stock.price}",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface

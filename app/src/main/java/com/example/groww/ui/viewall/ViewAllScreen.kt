@@ -135,7 +135,7 @@ private fun StockGrid(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        items(stocks) { stock ->
+        items(stocks, key = { it.ticker }) { stock ->
             StockCard(
                 stock = stock,
                 onClick = onStockClick
