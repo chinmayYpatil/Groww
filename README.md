@@ -1,5 +1,8 @@
 # Groww Stocks App
 
+## YouTube demo
+https://youtu.be/7ppLhD0A1GY?si=R_Z_ZWyTITYBDb3p
+
 ## Project Overview
 
 This is an Android application for a stocks broking platform, developed as a coding assignment for the App Intern role at Groww. The app allows users to explore top gaining and losing stocks, manage watchlists, and view detailed stock information with price graphs.
